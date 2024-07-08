@@ -48,4 +48,13 @@ def lu_chipman(M, transpose=True):
         MR = MR.transpose(-2, -1)
         Mdelta = Mdelta.transpose(-2, -1)
 
-    return MD, MR, Mdelta
+    return torch.stack([MD, MR, Mdelta])
+
+
+def batched_lc(M, transpose=True):
+
+    if M.shape[1] == 16: M = M.permute(0, 2, 3, 1)
+    x = lu_chipman(M.flatten(0, 1), transpose=transpose).flatten(-2, -1)
+    x = x.view(x.shape[0], *M.shape).permute(1, 0, 2, 3, 4)
+    
+    return x

@@ -11,9 +11,12 @@ def extract_depolarization(Mdelta):
     Returns:
     total_depolarization: Tensor of shape (H x W), representing the total depolarization for each matrix
     """
+
+    if Mdelta.shape[-1] == 16: Mdelta = Mdelta.view(*Mdelta.shape[:2], 4, 4)
     values = torch.stack([Mdelta[..., 1, 1], Mdelta[..., 2, 2], Mdelta[..., 3, 3]], dim=-1)
 
     return 1 - values.abs().mean(-1) 
+
 
 def extract_diattenuation(MD):
     """
@@ -29,6 +32,8 @@ def extract_diattenuation(MD):
         ori_d (torch.Tensor): Orientation of the linear diattenuation axes.
     """
 
+    if MD.shape[-1] == 16: MD = MD.view(*MD.shape[:2], 4, 4)
+
     # Ensure MD is a complex tensor (for handling potential negative numbers in square root)
     MD = MD.to(torch.complex64) if torch.any(MD < 0) else MD.to(torch.float64)
 
@@ -40,7 +45,7 @@ def extract_diattenuation(MD):
     # Determine the orientation of linear diattenuation
     ori_d = 0.5 * torch.atan2(MD[..., 0, 2].real, MD[..., 0, 1].real).real
 
-    return tot_d, lin_d, cir_d, ori_d
+    return torch.stack([tot_d, lin_d, cir_d, ori_d])
 
 
 def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=True):
@@ -63,6 +68,8 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
     orientation_linear_retardance - Orientation of the linear phase retardance axes (0° to 90°)
     orientation_linear_retardance_full - Orientation of the linear phase retardance axes (0° to 180°)
     """
+
+    if MR.shape[-1] == 16: MR = MR.view(*MR.shape[:2], 4, 4)
 
     if transpose: MR = MR.transpose(-2, -1)
 
@@ -114,7 +121,7 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
 
     orientation_linear_retardance = 90 + orientation_linear_retardance_full
 
-    return (MRL, MRC, tot_MR, retardance_vector, linear_retardance, circular_retardance, orientation_linear_retardance, orientation_linear_retardance_full)
+    return torch.stack([MRL, MRC]), torch.stack([tot_MR, circular_retardance, linear_retardance, orientation_linear_retardance, orientation_linear_retardance_full]), retardance_vector
 
 
 def rota(optical_rotation):
@@ -140,7 +147,7 @@ def rota(optical_rotation):
     cos_vals = torch.cos(2 * optical_rotation_rad)
     sin_vals = torch.sin(2 * optical_rotation_rad)
 
-    rot = torch.zeros(optical_rotation.shape + (4, 4), dtype=torch.float64, device=optical_rotation.device)
+    rot = torch.zeros(optical_rotation.shape + (4, 4), dtype=optical_rotation.dtype, device=optical_rotation.device)
     rot[..., 0, 0] = 1
     rot[..., 1, 1] = cos_vals
     rot[..., 1, 2] = -sin_vals
@@ -149,3 +156,15 @@ def rota(optical_rotation):
     rot[..., 3, 3] = 1
     
     return rot
+
+
+def batched_polarimetry(l):
+
+    datt = extract_diattenuation(l[:, 0].flatten(0, 1)).unsqueeze(1).view(4, l.shape[0], *l.shape[2:4]).permute(1, 0, 2, 3)
+    rmat, rimg, rvec = extract_retardance(l[:, 1].flatten(0, 1))
+    rmat = rmat.flatten(-2, -1).unsqueeze(1).view(2, l.shape[0], l.shape[2], l.shape[3], 16).permute(1, 0, 2, 3, 4)
+    rimg = rimg.unsqueeze(1).view(5, l.shape[0], l.shape[2], l.shape[3]).permute(1, 0, 2, 3)
+    rvec = rvec.unsqueeze(0).view(l.shape[0], l.shape[2], l.shape[3], 4).permute(0, 3, 1, 2)
+    dpol = extract_depolarization(l[:, -1].flatten(0, 1))[None, None].view(l.shape[0], 1, *l.shape[2:4])
+
+    return torch.cat([datt, rimg, rvec, dpol], dim=1)

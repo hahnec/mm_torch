@@ -1,10 +1,13 @@
 import torch
 
 
-def compute_azimuth(M):
-    return torch.atan2(M[..., 7], -M[..., 11]) / 2 + torch.pi/2
+def compute_azimuth(M, dim=-1):
+    Ma = M.index_select(dim, torch.tensor([7]))
+    Mb = M.index_select(dim, torch.tensor([11]))
+    return torch.atan2(Ma, -Mb) / 2 + torch.pi/2
 
-def rolling_window_metric(input_tensor, function=torch.std, patch_size=10, step_size=1):
+
+def rolling_window_metric(input_tensor, patch_size=4, function=torch.std, perc=1, step_size=1):
     """
     Computes a provided metric function over a patch_size x patch_size patch of entries that moves
     across the entire 2-dimensional input in a rolling window fashion.
@@ -34,9 +37,10 @@ def rolling_window_metric(input_tensor, function=torch.std, patch_size=10, step_
     output_shape = input_tensor.shape[0] - patch_size + 1, input_tensor.shape[1] - patch_size + 1
     result = result.view(output_shape)
     
-    return result
+    return torch.quantile(result, perc)
 
-def batched_rolling_window_metric(input_tensor, function=torch.std, patch_size=10, step_size=1):
+
+def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std, perc=1, step_size=1):
     """
     Computes a provided metric function over a patch_size x patch_size patch of entries that moves
     across the entire batched 2-dimensional input in a rolling window fashion.
@@ -65,5 +69,45 @@ def batched_rolling_window_metric(input_tensor, function=torch.std, patch_size=1
     # Reshape the result back to batched 2D
     output_shape = input_tensor.shape[0], input_tensor.shape[1] - patch_size + 1, input_tensor.shape[2] - patch_size + 1
     result = result.view(output_shape)
+
+    if 0 < perc < 1:
+        pvals = torch.quantile(result.flatten(output_shape[0], -1), perc, dim=1)
+        pvals_expanded = pvals[:, None, None].expand_as(result)
+        result = torch.minimum(result, pvals_expanded)
     
     return result
+
+
+def circstd(samples, high=2 * torch.pi, low=0, dim=-1):
+    """
+    Calculate the circular standard deviation for an array of circular data along a specified dimension.
+
+    Parameters:
+    samples (torch.Tensor): Input tensor of circular data.
+    high (float): Upper bound of the circular range (default: 2*pi).
+    low (float): Lower bound of the circular range (default: 0).
+    dim (int): Dimension along which to calculate the circular standard deviation (default: -1).
+
+    Returns:
+    torch.Tensor: Circular standard deviation along the specified dimension.
+    """
+    # Convert samples to radians
+    samples = (samples - low) * 2 * torch.pi / (high - low)
+    
+    # Compute sum of sines and cosines along the specified dimension
+    sin_sum = torch.sum(torch.sin(samples), dim=dim)
+    cos_sum = torch.sum(torch.cos(samples), dim=dim)
+    
+    # Compute mean angle along the specified dimension
+    mean_angle = torch.atan2(sin_sum, cos_sum)
+
+    # Compute resultant vector length R
+    R = torch.sqrt(sin_sum**2 + cos_sum**2) / samples.size(dim)
+
+    # Compute circular variance
+    circ_var = 1 - R
+
+    # Compute circular standard deviation
+    circ_std = torch.sqrt(-2 * torch.log(R))
+
+    return circ_std * (high - low) / (2 * torch.pi)

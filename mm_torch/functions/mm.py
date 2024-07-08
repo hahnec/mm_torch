@@ -89,7 +89,11 @@ def mm_filter(M, criterion = 1e-4):
 
 def batched_mm(A, W, I, transpose=True, norm=True, filter=False):
     shape = I.shape
-    return compute_mm(A.flatten(1, 2), W.flatten(1, 2), I.flatten(1, 2), transpose, norm, filter).reshape(shape)
+    if shape[1] == 16: A, W, I = A.permute(0, 2, 3, 1), W.permute(0, 2, 3, 1), I.permute(0, 2, 3, 1)
+    res = compute_mm(A.flatten(1, 2), W.flatten(1, 2), I.flatten(1, 2), transpose, norm, filter)
+    res = res.view(shape[0], *shape[2:], shape[1]) if shape[1] == 16 else res.view(*shape)
+    if shape[1] == 16: res = res.permute(0, 3, 1, 2)
+    return res
 
 
 if __name__ == '__main__':
