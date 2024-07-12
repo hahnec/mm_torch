@@ -71,9 +71,17 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     result = result.view(output_shape)
 
     if 0 < perc < 1:
-        pvals = torch.quantile(result.flatten(output_shape[0], -1), perc, dim=1)
-        pvals_expanded = pvals[:, None, None].expand_as(result)
-        result = torch.minimum(result, pvals_expanded)
+        pvals_max = torch.quantile(result.flatten(output_shape[0], -1), perc, dim=1)
+        pvals_max_expanded = pvals_max[:, None, None].expand_as(result)
+        result = torch.minimum(result, pvals_max_expanded)
+        pvals_min = torch.quantile(result.flatten(output_shape[0], -1), 1-perc, dim=1)
+        pvals_min_expanded = pvals_min[:, None, None].expand_as(result)
+        result = torch.maximum(result, pvals_min_expanded)
+
+    # padding
+    pad_half = (patch_size-1) // 2
+    pad_odd = (patch_size-1) % 2
+    result = torch.nn.functional.pad(result, [pad_half, pad_half+pad_odd, pad_half, pad_half+pad_odd], mode='replicate')
     
     return result
 
