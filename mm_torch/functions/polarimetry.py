@@ -78,7 +78,7 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
 
     # Determination of total, linear, and circular retardance parameters
     R = torch.where(torch.abs(argument) > 1-tol, 
-                    torch.where(argument > tol, torch.acos(torch.tensor(1.0)), torch.acos(torch.tensor(-1.0))), 
+                    torch.where(argument > tol, torch.acos(torch.tensor(1.0, device=MR.device)), torch.acos(torch.tensor(-1.0, device=MR.device))), 
                     torch.acos(argument.real))
     tot_MR = R * 180 / torch.pi
     retardance_normalization_index = 1 / (2 * torch.sin(R))

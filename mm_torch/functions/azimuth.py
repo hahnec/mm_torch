@@ -2,8 +2,8 @@ import torch
 
 
 def compute_azimuth(M, dim=-1):
-    Ma = M.index_select(dim, torch.tensor([7]))
-    Mb = M.index_select(dim, torch.tensor([11]))
+    Ma = M.index_select(dim, torch.tensor([7], device=M.device))
+    Mb = M.index_select(dim, torch.tensor([11], device=M.device))
     return torch.atan2(Ma, -Mb) / 2 + torch.pi/2
 
 
@@ -86,7 +86,7 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     return result
 
 
-def circstd(samples, high=2 * torch.pi, low=0, dim=-1):
+def circstd(samples, high=2, low=0, dim=-1):
     """
     Calculate the circular standard deviation for an array of circular data along a specified dimension.
 
@@ -100,22 +100,22 @@ def circstd(samples, high=2 * torch.pi, low=0, dim=-1):
     torch.Tensor: Circular standard deviation along the specified dimension.
     """
     # Convert samples to radians
-    samples = (samples - low) * 2 * torch.pi / (high - low)
+    samples = (samples - low) * 2 * torch.pi / (high*torch.pi - low)
     
     # Compute sum of sines and cosines along the specified dimension
     sin_sum = torch.sum(torch.sin(samples), dim=dim)
     cos_sum = torch.sum(torch.cos(samples), dim=dim)
     
     # Compute mean angle along the specified dimension
-    mean_angle = torch.atan2(sin_sum, cos_sum)
+    #mean_angle = torch.atan2(sin_sum, cos_sum)
 
     # Compute resultant vector length R
     R = torch.sqrt(sin_sum**2 + cos_sum**2) / samples.size(dim)
 
     # Compute circular variance
-    circ_var = 1 - R
+    #circ_var = 1 - R
 
     # Compute circular standard deviation
     circ_std = torch.sqrt(-2 * torch.log(R))
 
-    return circ_std * (high - low) / (2 * torch.pi)
+    return circ_std * (high*torch.pi - low) / (2 * torch.pi)

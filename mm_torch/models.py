@@ -37,7 +37,7 @@ class MuellerMatrixModel(nn.Module):
             if 'azimuth' in self.feature_keys:
                 y = torch.cat([y, feat_azi], dim=1)
             if 'std' in self.feature_keys:
-                feat_std = batched_rolling_window_metric(feat_azi.squeeze(1), patch_size=self.patch_size, function=circstd, perc=self.perc)[:, None]
+                feat_std = batched_rolling_window_metric(feat_azi.squeeze(1), patch_size=self.patch_size, perc=self.perc)[:, None]
                 y = torch.cat((y, feat_std), dim=1)
 
         return y
@@ -50,8 +50,8 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         self.method = kwargs.pop('method', 'pooling')
         self.mode = kwargs.pop('mode', 'bilinear')
         self.kernel_size = kwargs.pop('kernel_size', 0)
-        self.ichs = kwargs.pop('in_channels', 48)
         self.activation = kwargs.pop('activation', None)
+        self.ichs = kwargs.pop('in_channels', 48)
         super().__init__(*args, **kwargs)
 
         # spatial scalers
@@ -60,7 +60,9 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         elif self.method == 'averaging':
             self.downsampler = nn.AvgPool2d(2, stride=None, padding=0, dilation=1)
         self.upsampler = nn.Upsample(scale_factor=2, mode=self.mode, align_corners=True)
-        if self.activation: self.act_fun = nn.LeakyReLU(inplace=True) if self.activation.lower().__contains__('leaky') else nn.ReLU(inplace=True)
+        self.act_fun = None
+        if self.activation:
+            self.act_fun = nn.LeakyReLU(inplace=True) if self.activation.lower().__contains__('leaky') else nn.ReLU(inplace=True)
 
         # weight layers
         self.i_layers, self.o_layers = [], []
@@ -78,6 +80,9 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
                 else:
                     nn.init.xavier_uniform_(self.i_layers[i].weight)
                     nn.init.xavier_uniform_(self.o_layers[i].weight)
+            # use module list to enable device transfer
+            self.i_layers = nn.ModuleList(self.i_layers)
+            self.o_layers = nn.ModuleList(self.o_layers)
 
     def pad(self, m, h, w):
 

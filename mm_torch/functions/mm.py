@@ -24,7 +24,7 @@ def compute_mm(A, W, I, transpose=True, norm=True, filter=False):
     if transpose: M = M.transpose(-2, -1)
 
     # normalization
-    if norm: M /= M[..., 0, 0][..., None, None]
+    if norm: M = M / M[..., 0, 0][..., None, None]
 
     # filtering
     if filter: M = mm_filter(M)
@@ -71,7 +71,7 @@ def mm_filter(M, criterion = 1e-4):
         [1, 0, 0, -1],
         [0, 1, 1, 0],
         [0, 1j, -1j, 0]
-    ], dtype=N.dtype).unsqueeze(0).unsqueeze(0)
+    ], dtype=N.dtype, device=M.device).unsqueeze(0).unsqueeze(0)
     
     F = torch.stack([
         newN[..., 0,0], newN[..., 0,1], newN[..., 1,0], newN[..., 1,1],
