@@ -22,14 +22,14 @@ class MuellerMatrixModel(nn.Module):
     def forward(self, x):
         bc, fc, hc, wc = x.shape
         x, bA, bW = (x[:, :16], x[:, 16:32], x[:, 32:48]) if fc == 48 else (x[..., :16], self.bA, self.bW)
-        m = batched_mm(bA, bW, x, filter=True)
         y = torch.zeros((bc, 0, hc, wc), dtype=x.dtype, device=x.device)
+        m = batched_mm(bA, bW, x, filter=False)
         if 'intensity' in self.feature_keys:
             y = torch.cat((y, x), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if 'decompose' in self.feature_keys:
-            l = batched_lc(m)
+            l = batched_lc(m, filter=True)
             p = batched_polarimetry(l)
             y = torch.cat([y, p], dim=1)
         if 'azimuth' in self.feature_keys or 'std' in self.feature_keys:

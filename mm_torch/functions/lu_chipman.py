@@ -1,11 +1,13 @@
 import torch
+from .mm import mm_filter
 
 
-def lu_chipman(M, transpose=True):
+def lu_chipman(M, transpose=True, filter=False):
 
     # init
     h, w = M.shape[:2]
     M = M.reshape(h, w, 4, 4)
+    if filter: M = mm_filter(M)
     if transpose: M = M.transpose(-2, -1)
 
     # diattenuation matrix
@@ -24,7 +26,8 @@ def lu_chipman(M, transpose=True):
     M_0 = torch.linalg.solve(MD, M)  # Equivalent to M / MD
     
     # retardance
-    U_R, S_R, V_R = torch.linalg.svd(M_0[..., 1:4, 1:4])
+    U_R, S_R, V_R = torch.linalg.svd(M_0[..., 1:4, 1:4], full_matrices=True)
+    #V_R = V_R.transpose(-1, -2).conj() # matlab's V
 
     # unit vector to replace rectangular diagonal matrix (capital sigma)
     S_R = torch.diag(torch.ones(3, dtype=M.dtype, device=M.device))[None, None].repeat(h, w, 1, 1)
@@ -51,10 +54,10 @@ def lu_chipman(M, transpose=True):
     return torch.stack([MD, MR, Mdelta])
 
 
-def batched_lc(M, transpose=True):
+def batched_lc(M, transpose=True, filter=False):
 
     if M.shape[1] == 16: M = M.permute(0, 2, 3, 1)
-    x = lu_chipman(M.flatten(0, 1), transpose=transpose).flatten(-2, -1)
+    x = lu_chipman(M.flatten(0, 1), transpose=transpose, filter=filter).flatten(-2, -1)
     x = x.view(x.shape[0], *M.shape).permute(1, 0, 2, 3, 4)
     
     return x

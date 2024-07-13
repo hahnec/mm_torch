@@ -35,7 +35,8 @@ def compute_mm(A, W, I, transpose=True, norm=True, filter=False):
 def mm_filter(M, criterion = 1e-4):
 
     h, w = M.shape[:2]
-    M = M.reshape(h, w, 4, 4) if M.shape[-1] == 16 else M
+    chs = M.shape[-1]
+    M = M.reshape(h, w, 4, 4) if chs == 16 else M
 
     # Complex-valued covariance matrix
     N = 0.25 * torch.stack([
@@ -85,7 +86,7 @@ def mm_filter(M, criterion = 1e-4):
         
     M[invalid_mask] = M_filtered[invalid_mask]
 
-    return M.reshape(h, w, 16)
+    return M.reshape(h, w, 16) if chs == 16 else M
 
 def batched_mm(A, W, I, transpose=True, norm=True, filter=False):
     shape = I.shape
