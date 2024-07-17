@@ -8,7 +8,7 @@ def lu_chipman(M, transpose=True, filter=False):
     h, w = M.shape[:2]
     M = M.reshape(h, w, 4, 4)
     if transpose: M = M.transpose(-2, -1)
-    if filter: M = mm_filter(M)
+    if filter: M, mask = mm_filter(M)
 
     # diattenuation matrix
     dvec = torch.stack([M[..., 0, 1], M[..., 0, 2], M[..., 0, 3]], dim=-1) / (M[..., 0, 0][..., None] +  1e-13)
@@ -18,12 +18,14 @@ def lu_chipman(M, transpose=True, filter=False):
     D1 = D1[..., None, None]
     
     MD = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
-    MD[..., 0, 1:] = dvec
-    MD[..., 1:, 0] = dvec
-    outer_product = dvec[..., None] * dvec[..., None, :] # torch.outer(dvec, dvec)
-    MD[..., 1:, 1:] = D1 * torch.eye(3, device=M.device)[None, None].repeat(h, w, 1, 1) + (1 - D1) * outer_product / D**2
-    M_0 = torch.linalg.solve(MD, M)  # Equivalent to M / MD
-    
+    M_0 = M
+    if D != 0:
+        MD[..., 0, 1:] = dvec
+        MD[..., 1:, 0] = dvec
+        outer_product = dvec[..., None] * dvec[..., None, :] # torch.outer(dvec, dvec)
+        MD[..., 1:, 1:] = D1 * torch.eye(3, device=M.device)[None, None].repeat(h, w, 1, 1) + (1 - D1) * outer_product / D**2
+        M_0 = M @ torch.linalg.inv(MD)
+        
     # retardance
     U_R, S_R, V_R = torch.linalg.svd(M_0[..., 1:4, 1:4], full_matrices=True)
     #V_R = V_R.transpose(-1, -2).conj() # matlab's V
