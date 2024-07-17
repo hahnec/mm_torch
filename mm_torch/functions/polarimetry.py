@@ -80,7 +80,7 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
     R = torch.where(torch.abs(argument) > 1-tol, 
                     torch.where(argument > tol, torch.acos(torch.tensor(1.0, device=MR.device)), torch.acos(torch.tensor(-1.0, device=MR.device))), 
                     torch.acos(argument.real))
-    tot_MR = R * 180 / torch.pi
+    tot_MR = R / torch.pi * 180
     retardance_normalization_index = 1 / (2 * torch.sin(R))
 
     # Components of the retardance vector
@@ -89,16 +89,16 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
     a3 = R * retardance_normalization_index * (MR[..., 1, 2] - MR[..., 2, 1])
     retardance_vector = torch.stack([torch.ones_like(a1), a1, a2, a3], dim=-1)
 
-    # Extraction of linear and circular phase retardance 
-    linear_retardance = torch.acos(MR[..., 3, 3].real) * 180 / torch.pi
-    circular_retardance = torch.atan2((MR[..., 2, 1] - MR[..., 1, 2]).real, (MR[..., 2, 2] + MR[..., 1, 1]).real) * 180 / torch.pi
+    # Extraction of linear and circular phase retardance
+    linear_retardance = torch.acos(MR[..., 3, 3].real) / torch.pi * 180
+    circular_retardance = torch.atan2((MR[..., 2, 1] - MR[..., 1, 2]).real, (MR[..., 2, 2] + MR[..., 1, 1]).real) / torch.pi * 180
 
     # Decomposition of the retardance matrix into a linear-circular product
     MRC = rota(circular_retardance / 2)
 
     # Determination of the linear phase retardance azimuth between 0° and 90°
     circular_retardance_temp = lambda MRL: torch.atan2( (MRL[..., 2, 1] - MRL[..., 1, 2]).real, 
-                                                        (MRL[..., 2, 2] + MRL[..., 1, 1]).real) * 180 / torch.pi
+                                                        (MRL[..., 2, 2] + MRL[..., 1, 1]).real) / torch.pi * 180
     if decomposition_choice == 'LIN-CIR':
         MRL = MR @ MRC.transpose(-2, -1)
         cir_temp = circular_retardance_temp(MRL)
@@ -111,17 +111,15 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
         MRL[mask] = (MRC @ MR)[mask]
     MRL[tot_MR<tol] = MR[tot_MR<tol]
 
-    orientation_linear_retardance = torch.atan2(MRL[..., 1, 3], MRL[..., 3, 2]) * 180 / torch.pi
+    orientation_linear_retardance = torch.atan2(MRL[..., 1, 3], MRL[..., 3, 2]) / torch.pi * 180
     #orientation_linear_retardance[tot_MR<0] = tol
 
     mask = orientation_linear_retardance < tol
-    orientation_linear_retardance[mask] = 360 - orientation_linear_retardance[mask]
+    orientation_linear_retardance[mask] = 360 - abs(orientation_linear_retardance[mask])
+    orientation_linear_retardance = orientation_linear_retardance / 2
+    #orientation_linear_retardance = 90 + orientation_linear_retardance
 
-    orientation_linear_retardance_full = 0.5 * orientation_linear_retardance
-
-    orientation_linear_retardance = 90 + orientation_linear_retardance_full
-
-    return torch.stack([MRL, MRC]), torch.stack([tot_MR, circular_retardance, linear_retardance, orientation_linear_retardance, orientation_linear_retardance_full]), retardance_vector
+    return torch.stack([MRL, MRC]), torch.stack([tot_MR, circular_retardance, linear_retardance, orientation_linear_retardance]), retardance_vector
 
 
 def rota(optical_rotation):
@@ -134,12 +132,6 @@ def rota(optical_rotation):
         optical_rotation - Tensor of shape (N, M) representing angles of "optical rotation"
     Outputs:
         rot: Tensor of shape (N, M, 4, 4) representing circular retarder matrices for each input angle
-
-    === Signature ===
-    Author: Jeremy Vizet, Ph.D., optical polarimetry
-    Ecole polytechnique, LPICM
-    email address: jeremy.vizet@polytechnique.edu
-    December 2017; Last revision: 2017-12-11
     """
 
     optical_rotation_rad = optical_rotation * torch.pi / 180
@@ -160,10 +152,11 @@ def rota(optical_rotation):
 
 def batched_polarimetry(l):
 
+    #l = l.permute(0, 1, 3, 4, 2)
     datt = extract_diattenuation(l[:, 0].flatten(0, 1)).unsqueeze(1).view(4, l.shape[0], *l.shape[2:4]).permute(1, 0, 2, 3)
     rmat, rimg, rvec = extract_retardance(l[:, 1].flatten(0, 1))
     rmat = rmat.flatten(-2, -1).unsqueeze(1).view(2, l.shape[0], l.shape[2], l.shape[3], 16).permute(1, 0, 2, 3, 4)
-    rimg = rimg.unsqueeze(1).view(5, l.shape[0], l.shape[2], l.shape[3]).permute(1, 0, 2, 3)
+    rimg = rimg.unsqueeze(1).view(4, l.shape[0], l.shape[2], l.shape[3]).permute(1, 0, 2, 3)
     rvec = rvec.unsqueeze(0).view(l.shape[0], l.shape[2], l.shape[3], 4).permute(0, 3, 1, 2)
     dpol = extract_depolarization(l[:, -1].flatten(0, 1))[None, None].view(l.shape[0], 1, *l.shape[2:4])
 

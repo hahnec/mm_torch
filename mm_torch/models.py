@@ -4,7 +4,7 @@ import torch.nn as nn
 from mm.functions.mm import batched_mm
 from mm.functions.lu_chipman import batched_lc
 from mm.functions.polarimetry import batched_polarimetry
-from mm.functions.azimuth import compute_azimuth, batched_rolling_window_metric, circstd
+from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
@@ -18,27 +18,27 @@ class MuellerMatrixModel(nn.Module):
         self.bW = bW
         self.feature_chs = [('intensity', 16), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1)]
         self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys])
+        self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
 
     def forward(self, x):
         bc, fc, hc, wc = x.shape
         x, bA, bW = (x[:, :16], x[:, 16:32], x[:, 32:48]) if fc == 48 else (x[..., :16], self.bA, self.bW)
         y = torch.zeros((bc, 0, hc, wc), dtype=x.dtype, device=x.device)
-        m = batched_mm(bA, bW, x, filter=False)
+        m = batched_mm(bA, bW, x, norm=True, filter=False)
         if 'intensity' in self.feature_keys:
             y = torch.cat((y, x), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
-        if 'decompose' in self.feature_keys:
+        if any(key in self.feature_keys for key in ('azimuth', 'std')):
             l = batched_lc(m, filter=True)
             p = batched_polarimetry(l)
-            y = torch.cat([y, p], dim=1)
-        if 'azimuth' in self.feature_keys or 'std' in self.feature_keys:
-            feat_azi = compute_azimuth(m, dim=1)
-            if 'azimuth' in self.feature_keys:
-                y = torch.cat([y, feat_azi], dim=1)
-            if 'std' in self.feature_keys:
-                feat_std = batched_rolling_window_metric(feat_azi.squeeze(1), patch_size=self.patch_size, perc=self.perc)[:, None]
-                y = torch.cat((y, feat_std), dim=1)
+            if any(key in self.feature_keys for key in ('azimuth', 'std')):
+                feat_azi = p[:, 7]
+                if 'azimuth' in self.feature_keys:
+                    y = torch.cat([y, feat_azi[:, None]], dim=1)
+                if 'std' in self.feature_keys:
+                    feat_std = batched_rolling_window_metric(feat_azi, patch_size=self.patch_size, perc=self.perc, function=self.rolling_fun)
+                    y = torch.cat((y, feat_std[:, None]), dim=1)
 
         return y
 
@@ -47,12 +47,16 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
     def __init__(self, *args, **kwargs):
 
         self.levels = kwargs.pop('levels', 2)
+        assert self.levels > 0 and isinstance(self.levels, int), 'Levels must be a greater integer than zero.'
         self.method = kwargs.pop('method', 'pooling')
         self.mode = kwargs.pop('mode', 'bilinear')
         self.kernel_size = kwargs.pop('kernel_size', 0)
         self.activation = kwargs.pop('activation', None)
         self.ichs = kwargs.pop('in_channels', 48)
         super().__init__(*args, **kwargs)
+
+        # use differentiable window function for back-propagation
+        if self.kernel_size > 0: self.rolling_win_fun = torch.std
 
         # spatial scalers
         if self.method == 'pooling':

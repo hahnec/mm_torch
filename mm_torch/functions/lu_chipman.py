@@ -18,7 +18,6 @@ def lu_chipman(M, transpose=True, filter=False):
     D1 = D1[..., None, None]
     
     MD = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
-    M_0 = M.clone()
     MD[..., 0, 1:] = dvec
     MD[..., 1:, 0] = dvec
     outer_product = dvec[..., None] * dvec[..., None, :] # torch.outer(dvec, dvec)
@@ -59,5 +58,6 @@ def batched_lc(M, transpose=True, filter=False):
     if M.shape[1] == 16: M = M.permute(0, 2, 3, 1)
     x = lu_chipman(M.flatten(0, 1), transpose=transpose, filter=filter).flatten(-2, -1)
     x = x.view(x.shape[0], *M.shape).permute(1, 0, 2, 3, 4)
+    #x = x.view(x.shape[0], *M.shape).permute(1, 0, 4, 2, 3)
     
     return x
