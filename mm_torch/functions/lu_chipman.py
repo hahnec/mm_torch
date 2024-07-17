@@ -17,15 +17,16 @@ def lu_chipman(M, transpose=True, filter=False):
     D = D[..., None, None]
     D1 = D1[..., None, None]
     
-    MD = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
     M_0 = M
-    if D != 0:
-        MD[..., 0, 1:] = dvec
-        MD[..., 1:, 0] = dvec
-        outer_product = dvec[..., None] * dvec[..., None, :] # torch.outer(dvec, dvec)
-        MD[..., 1:, 1:] = D1 * torch.eye(3, device=M.device)[None, None].repeat(h, w, 1, 1) + (1 - D1) * outer_product / D**2
-        M_0 = M @ torch.linalg.inv(MD)
-        
+    MD = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
+    MD[..., 0, 1:] = dvec
+    MD[..., 1:, 0] = dvec
+    outer_product = dvec[..., None] * dvec[..., None, :] # torch.outer(dvec, dvec)
+    MD[..., 1:, 1:] = D1 * torch.eye(3, device=M.device)[None, None].repeat(h, w, 1, 1) + (1 - D1) * outer_product / D**2
+    M_0 = M @ torch.linalg.inv(MD)
+    MD[D.squeeze()==0] = torch.eye(4, dtype=M.dtype, device=M.device)
+    M_0[D.squeeze()==0] = M[D.squeeze()==0]
+
     # retardance
     U_R, S_R, V_R = torch.linalg.svd(M_0[..., 1:4, 1:4], full_matrices=True)
     #V_R = V_R.transpose(-1, -2).conj() # matlab's V
