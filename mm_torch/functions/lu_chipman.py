@@ -7,8 +7,8 @@ def lu_chipman(M, transpose=True, filter=False):
     # init
     h, w = M.shape[:2]
     M = M.reshape(h, w, 4, 4)
-    if filter: M = mm_filter(M)
     if transpose: M = M.transpose(-2, -1)
+    if filter: M = mm_filter(M)
 
     # diattenuation matrix
     dvec = torch.stack([M[..., 0, 1], M[..., 0, 2], M[..., 0, 3]], dim=-1) / (M[..., 0, 0][..., None] +  1e-13)
