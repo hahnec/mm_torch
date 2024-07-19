@@ -2,13 +2,14 @@ import torch
 import torch.nn as nn
 
 from mm.functions.mm import batched_mm
+from mm.functions.mm_filter import EIG, PSD, SC
 from mm.functions.lu_chipman import batched_lc
 from mm.functions.polarimetry import batched_polarimetry
 from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
-    def __init__(self, feature_keys=[], patch_size=4, perc=1, bA=None, bW=None, *args, **kwargs):
+    def __init__(self, feature_keys=[], mask_fun=EIG, patch_size=4, perc=1, bA=None, bW=None, *args, **kwargs):
         super(MuellerMatrixModel, self).__init__(*args, **kwargs)
 
         self.feature_keys = feature_keys
@@ -19,18 +20,20 @@ class MuellerMatrixModel(nn.Module):
         self.feature_chs = [('intensity', 16), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1)]
         self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys])
         self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
+        self.mask_fun = mask_fun
 
     def forward(self, x):
         bc, fc, hc, wc = x.shape
         x, bA, bW = (x[:, :16], x[:, 16:32], x[:, 32:48]) if fc == 48 else (x[..., :16], self.bA, self.bW)
         y = torch.zeros((bc, 0, hc, wc), dtype=x.dtype, device=x.device)
-        m = batched_mm(bA, bW, x, norm=True, filter=False)
+        m = batched_mm(bA, bW, x, norm=True)
         if 'intensity' in self.feature_keys:
             y = torch.cat((y, x), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std')):
-            l = batched_lc(m, filter=True)
+            v = self.mask_fun(m.permute(0, 2, 3, 1).reshape(m.shape[0], m.shape[2], m.shape[3], 4, 4)).unsqueeze(1)
+            l = batched_lc(m, mask=v.squeeze())
             p = batched_polarimetry(l)
             if any(key in self.feature_keys for key in ('azimuth', 'std')):
                 feat_azi = p[:, 7]
@@ -39,6 +42,7 @@ class MuellerMatrixModel(nn.Module):
                 if 'std' in self.feature_keys:
                     feat_std = batched_rolling_window_metric(feat_azi, patch_size=self.patch_size, perc=self.perc, function=self.rolling_fun)
                     y = torch.cat((y, feat_std[:, None]), dim=1)
+            y = torch.cat([y, v], dim=1)
 
         return y
 

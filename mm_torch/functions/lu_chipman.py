@@ -1,21 +1,20 @@
 import torch
-from .mm import mm_filter
+from .mm_filter import EIG as mm_filter
 
 
-def lu_chipman(M, transpose=True, filter=False):
+def lu_chipman(M, mask=None, transpose=True):
 
     # init
     h, w = M.shape[:2]
     M = M.reshape(h, w, 4, 4)
     if transpose: M = M.transpose(-2, -1)
-    if filter: M, mask = mm_filter(M)
+    if mask is None: mask = mm_filter(M)
 
     # diattenuation matrix
     dvec = torch.stack([M[..., 0, 1], M[..., 0, 2], M[..., 0, 3]], dim=-1) / (M[..., 0, 0][..., None] +  1e-13)
     D = (M[..., 0, 1]**2 + M[..., 0, 2]**2 + M[..., 0, 3]**2)**.5
     D1 = (1 - D**2)**.5
-    D = D[..., None, None]
-    D1 = D1[..., None, None]
+    D, D1 = D[..., None, None], D1[..., None, None]
     
     M_0 = M
     MD = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
@@ -28,8 +27,10 @@ def lu_chipman(M, transpose=True, filter=False):
     M_0[D.squeeze()==0] = M[D.squeeze()==0]
 
     # retardance
-    U_R, S_R, V_R = torch.linalg.svd(M_0[..., 1:4, 1:4], full_matrices=True)
-    #V_R = V_R.transpose(-1, -2).conj() # matlab's V
+    U_R = torch.zeros_like(M_0[..., 1:4, 1:4])
+    S_R = torch.zeros_like(M_0[..., 1:4, 0])
+    V_R = torch.zeros_like(M_0[..., 1:4, 1:4])
+    U_R[mask], S_R[mask], V_R[mask] = torch.linalg.svd(M_0[..., 1:4, 1:4][mask], full_matrices=False)
 
     # unit vector to replace rectangular diagonal matrix (capital sigma)
     S_R = torch.diag(torch.ones(3, dtype=M.dtype, device=M.device))[None, None].repeat(h, w, 1, 1)
@@ -56,10 +57,10 @@ def lu_chipman(M, transpose=True, filter=False):
     return torch.stack([MD, MR, Mdelta])
 
 
-def batched_lc(M, transpose=True, filter=False):
+def batched_lc(M, mask=None, transpose=True):
 
     if M.shape[1] == 16: M = M.permute(0, 2, 3, 1)
-    x = lu_chipman(M.flatten(0, 1), transpose=transpose, filter=filter).flatten(-2, -1)
+    x= lu_chipman(M.flatten(0, 1), mask=mask.flatten(0, 1), transpose=transpose).flatten(-2, -1)
     x = x.view(x.shape[0], *M.shape).permute(1, 0, 2, 3, 4)
     #x = x.view(x.shape[0], *M.shape).permute(1, 0, 4, 2, 3)
     
