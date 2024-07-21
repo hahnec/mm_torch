@@ -16,7 +16,6 @@ def lu_chipman(M, mask=None, transpose=True):
     D1 = (1 - D**2)**.5
     D, D1 = D[..., None, None], D1[..., None, None]
     
-    M_0 = M
     MD = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
     MD[..., 0, 1:] = dvec
     MD[..., 1:, 0] = dvec
@@ -28,18 +27,16 @@ def lu_chipman(M, mask=None, transpose=True):
 
     # retardance
     U_R = torch.zeros_like(M_0[..., 1:4, 1:4])
-    S_R = torch.zeros_like(M_0[..., 1:4, 0])
     V_R = torch.zeros_like(M_0[..., 1:4, 1:4])
-    U_R[mask], S_R[mask], V_R[mask] = torch.linalg.svd(M_0[..., 1:4, 1:4][mask], full_matrices=False)
+    U_R[mask], _, V_R[mask] = torch.linalg.svd(M_0[..., 1:4, 1:4][mask], full_matrices=False)
 
     # unit vector to replace rectangular diagonal matrix (capital sigma)
-    S_R = torch.diag(torch.ones(3, dtype=M.dtype, device=M.device))[None, None].repeat(h, w, 1, 1)
+    S_R = torch.eye(3, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
     S_R[..., -1, -1][torch.sign(torch.det(M)) < 0] = -1 # modification of MR when the determinant of M is negative
 
-    # Construct mR and MR
-    mR = U_R @ S_R @ V_R    #.transpose(-2, -1)
+    # Construct MR
     MR = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
-    MR[..., 1:4, 1:4] = mR
+    MR[..., 1:4, 1:4] = U_R @ (S_R @ V_R)    #.transpose(-2, -1)
 
     # depolarization
     Mdelta = torch.matmul(M_0, MR.transpose(-2, -1))
