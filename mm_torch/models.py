@@ -33,7 +33,7 @@ class MuellerMatrixModel(nn.Module):
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std')):
             v = self.mask_fun(m.permute(0, 2, 3, 1).reshape(m.shape[0], m.shape[2], m.shape[3], 4, 4)).unsqueeze(1)
-            l = batched_lc(m, mask=v.squeeze())
+            l = batched_lc(m, mask=v.squeeze(1))
             p = batched_polarimetry(l)
             if any(key in self.feature_keys for key in ('azimuth', 'std')):
                 feat_azi = p[:, 7]
