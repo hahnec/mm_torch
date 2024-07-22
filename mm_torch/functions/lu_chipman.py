@@ -30,7 +30,7 @@ def lu_chipman(
     # Construct MR
     MR = torch.eye(4, dtype=M.dtype, device=M.device)[None,]*len(hw)
     MR = MR.repeat(*hw, 1, 1)
-    MR[..., 1:4, 1:4] = U_R @ (S_R @ V_R)    #.transpose(-2, -1)
+    MR[..., 1:4, 1:4] = U_R @ S_R @ V_R
 
     # depolarization
     Mdelta = torch.matmul(M_0, MR.transpose(-2, -1))
