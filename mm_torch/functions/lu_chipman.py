@@ -10,10 +10,10 @@ def lu_chipman(
         ):
 
     # init
-    hw = M.shape[:-2]
-    M = M.reshape(*hw, 4, 4)
+    if M.shape[-1] == 16: M = M.reshape(*M.shape[:-1], 4, 4)
     if transpose: M = M.transpose(-2, -1)
     if mask is None: mask = mm_filter(M)
+    hw = M.shape[:-2]
 
     M_0, MD = diattenuation_matrix(M)
 
