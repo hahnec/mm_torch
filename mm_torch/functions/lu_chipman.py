@@ -2,7 +2,7 @@ import torch
 from .mm_filter import EIG as mm_filter
 
 
-def lu_chipman(M, mask=None, transpose=True):
+def lu_chipman(M, mask=None, transpose=True, svd_fun=torch.linalg.svd):
 
     # init
     h, w = M.shape[:2]
@@ -10,25 +10,12 @@ def lu_chipman(M, mask=None, transpose=True):
     if transpose: M = M.transpose(-2, -1)
     if mask is None: mask = mm_filter(M)
 
-    # diattenuation matrix
-    dvec = torch.stack([M[..., 0, 1], M[..., 0, 2], M[..., 0, 3]], dim=-1) / (M[..., 0, 0][..., None] +  1e-13)
-    D = (M[..., 0, 1]**2 + M[..., 0, 2]**2 + M[..., 0, 3]**2)**.5
-    D1 = (1 - D**2)**.5
-    D, D1 = D[..., None, None], D1[..., None, None]
-    
-    MD = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
-    MD[..., 0, 1:] = dvec
-    MD[..., 1:, 0] = dvec
-    outer_product = dvec[..., None] * dvec[..., None, :] # torch.outer(dvec, dvec)
-    MD[..., 1:, 1:] = D1 * torch.eye(3, device=M.device)[None, None].repeat(h, w, 1, 1) + (1 - D1) * outer_product / D**2
-    M_0 = M @ torch.linalg.inv(MD)
-    MD[D.squeeze()==0] = torch.eye(4, dtype=M.dtype, device=M.device)
-    M_0[D.squeeze()==0] = M[D.squeeze()==0]
+    M_0, MD = diattenuation_matrix(M)
 
     # retardance
     U_R = torch.zeros_like(M_0[..., 1:4, 1:4])
     V_R = torch.zeros_like(M_0[..., 1:4, 1:4])
-    U_R[mask], _, V_R[mask] = torch.linalg.svd(M_0[..., 1:4, 1:4][mask], full_matrices=False)
+    U_R[mask], _, V_R[mask] = svd_fun(M_0[..., 1:4, 1:4][mask], full_matrices=False)
 
     # unit vector to replace rectangular diagonal matrix (capital sigma)
     S_R = torch.eye(3, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
@@ -53,6 +40,25 @@ def lu_chipman(M, mask=None, transpose=True):
 
     return torch.stack([MD, MR, Mdelta])
 
+def diattenuation_matrix(M):
+
+    h, w = M.shape[:2]
+
+    dvec = torch.stack([M[..., 0, 1], M[..., 0, 2], M[..., 0, 3]], dim=-1) / (M[..., 0, 0][..., None] +  1e-13)
+    D = (M[..., 0, 1]**2 + M[..., 0, 2]**2 + M[..., 0, 3]**2)**.5
+    D1 = (1 - D**2)**.5
+    D, D1 = D[..., None, None], D1[..., None, None]
+    
+    MD = torch.eye(4, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
+    MD[..., 0, 1:] = dvec
+    MD[..., 1:, 0] = dvec
+    outer_product = dvec[..., None] * dvec[..., None, :] # torch.outer(dvec, dvec)
+    MD[..., 1:, 1:] = D1 * torch.eye(3, device=M.device)[None, None].repeat(h, w, 1, 1) + (1 - D1) * outer_product / D**2
+    M_0 = M @ torch.linalg.inv(MD)
+    MD[D.squeeze()==0] = torch.eye(4, dtype=M.dtype, device=M.device)
+    M_0[D.squeeze()==0] = M[D.squeeze()==0]
+
+    return M_0, MD
 
 def batched_lc(M, mask=None, transpose=True):
 
