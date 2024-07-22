@@ -6,7 +6,7 @@ def lu_chipman(
         M, 
         mask=None, 
         transpose=True, 
-        svd_fun=lambda x: torch.linalg.svd(x, full_matrix=False),
+        svd_fun=lambda x: torch.linalg.svd(x, full_matrices=False),
         ):
 
     # init
