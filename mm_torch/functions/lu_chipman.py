@@ -2,7 +2,12 @@ import torch
 from .mm_filter import EIG as mm_filter
 
 
-def lu_chipman(M, mask=None, transpose=True, svd_fun=torch.linalg.svd):
+def lu_chipman(
+        M, 
+        mask=None, 
+        transpose=True, 
+        svd_fun=lambda x: torch.linalg.svd(x, full_matrix=False),
+        ):
 
     # init
     h, w = M.shape[:2]
@@ -15,7 +20,7 @@ def lu_chipman(M, mask=None, transpose=True, svd_fun=torch.linalg.svd):
     # retardance
     U_R = torch.zeros_like(M_0[..., 1:4, 1:4])
     V_R = torch.zeros_like(M_0[..., 1:4, 1:4])
-    U_R[mask], _, V_R[mask] = svd_fun(M_0[..., 1:4, 1:4][mask], full_matrices=False)
+    U_R[mask], _, V_R[mask] = svd_fun(M_0[..., 1:4, 1:4][mask])
 
     # unit vector to replace rectangular diagonal matrix (capital sigma)
     S_R = torch.eye(3, dtype=M.dtype, device=M.device)[None, None].repeat(h, w, 1, 1)
