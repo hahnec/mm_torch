@@ -9,7 +9,7 @@ from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
-    def __init__(self, feature_keys=[], mask_fun=EIG, patch_size=4, perc=1, bA=None, bW=None, wnum=None, *args, **kwargs):
+    def __init__(self, feature_keys=[], mask_fun=PSD, patch_size=4, perc=1, bA=None, bW=None, wnum=None, *args, **kwargs):
         super(MuellerMatrixModel, self).__init__(*args, **kwargs)
 
         self.feature_keys = feature_keys
@@ -24,22 +24,25 @@ class MuellerMatrixModel(nn.Module):
         self.mask_fun = mask_fun
 
     def forward(self, x):
-        bc, fc, hc, wc = x.shape
-        x = x.view(bc, self.wnum, 48, hc, wc).permute(0,1,3,4,2) if self.wnum > 1 else x.view(bc, 48, hc, wc).permute(0,2,3,1) # pack mueller matrix to last dimension
-        x, bA, bW = (x[..., :16], self.bA, self.bW) if fc == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
+        b, f, h, w = x.shape
+        # unravel wavelength dimension and pack Mueller features to last dimension
+        x = x.view(b, self.wnum, 48, h, w).moveaxis(2, -1)
+        # split calibration data
+        x, bA, bW = (x[..., :16], self.bA, self.bW) if f == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
+        # compute Mueller matrix
         m = compute_mm(bA, bW, x, norm=True)
-        y = torch.zeros((bc, 0, hc, wc), dtype=x.dtype, device=x.device)
+        # compute polarimetry feature maps
+        y = torch.zeros((b, 0, h, w), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
             y = torch.cat((y, x.moveaxis(-1, 1).flatten(1, 2) if self.wnum > 1 else x.moveaxis(-1, 1)), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std')):
             v = self.mask_fun(m)
-            v = v if self.wnum > 1 else v.unsqueeze(1)
             l = batched_lc(m, mask=v)
             p = batched_polarimetry(l)
             if any(key in self.feature_keys for key in ('azimuth', 'std')):
-                feat_azi = p[:, 7] if self.wnum > 1 else p[:, 7][:, None]
+                feat_azi = p[:, 7]
                 if 'azimuth' in self.feature_keys:
                     y = torch.cat([y, feat_azi], dim=1)
                 if 'std' in self.feature_keys:

@@ -135,6 +135,8 @@ def C4(M):
              2 * M[..., 3, 3]**2))
 
 def PSD(M):
+    shape = M.shape
+    if shape[-1] == 16: M = M.view(*shape[:-1], 4, 4)
     return ((C1(M) >= 0) & (C2(M) >= 0) & (C3(M) >= 0) & (C4(M) >= 0))
 
 import torch
@@ -172,6 +174,8 @@ def D3(M):
     )
 
 def SC(M):
+    shape = M.shape
+    if shape[-1] == 16: M = M.view(*shape[:-1], 4, 4)
     return ((D1(M) >= 0) & (D2(M) >= 0) & (D3(M) >= 0))
 
 
