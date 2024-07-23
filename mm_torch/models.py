@@ -19,7 +19,7 @@ class MuellerMatrixModel(nn.Module):
         self.bW = bW
         self.wnum = wnum
         self.feature_chs = [('intensity', 16), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1)]
-        self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys])
+        self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys]) * wnum
         self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
         self.mask_fun = mask_fun
 
@@ -30,7 +30,7 @@ class MuellerMatrixModel(nn.Module):
         m = compute_mm(bA, bW, x, norm=True)
         y = torch.zeros((bc, 0, hc, wc), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
-            y = torch.cat((y, x), dim=1)
+            y = torch.cat((y, x.moveaxis(-1, 1).flatten(1, 2) if self.wnum > 1 else x.moveaxis(-1, 1)), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std')):
@@ -61,6 +61,7 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         self.activation = kwargs.pop('activation', None)
         self.ichs = kwargs.pop('in_channels', 48)
         super().__init__(*args, **kwargs)
+        self.ochs *= self.levels
 
         # use differentiable window function for back-propagation
         if self.kernel_size > 0: self.rolling_win_fun = torch.std
