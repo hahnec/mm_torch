@@ -2,9 +2,9 @@ import torch
 
 def EIG(M):
 
-    h, w = M.shape[:2]
     chs = M.shape[-1]
-    M = M.reshape(h, w, 4, 4) if chs == 16 else M
+    shape = M.shape[:-1] if chs == 16 else M.shape[:-2]
+    M = M.reshape(*shape, 4, 4) if chs == 16 else M
 
     # Complex-valued covariance matrix
     N = 0.25 * torch.stack([
@@ -24,7 +24,7 @@ def EIG(M):
         M[..., 2, 0] - M[..., 2, 1] + 1j * (M[..., 3, 0] - M[..., 3, 1]),
         M[..., 0, 2] - M[..., 1, 2] - 1j * (M[..., 0, 3] - M[..., 1, 3]),
         M[..., 0, 0] + M[..., 1, 1] - M[..., 0, 1] - M[..., 1, 0]
-    ], dim=-1).reshape(*M.shape[:-2], 4, 4)
+    ], dim=-1).reshape(*shape, 4, 4)
 
     # Eigenvalue extraction
     D = torch.linalg.eigvals(N)
@@ -36,9 +36,9 @@ def EIG(M):
 
 def mm_filter(M, criterion = 1e-4):
 
-    h, w = M.shape[:2]
     chs = M.shape[-1]
-    M = M.reshape(h, w, 4, 4) if chs == 16 else M
+    shape = M.shape[:-1] if chs == 16 else M.shape[:-2]
+    M = M.reshape(*shape, 4, 4) if chs == 16 else M
 
     # Complex-valued covariance matrix
     N = 0.25 * torch.stack([
@@ -58,7 +58,7 @@ def mm_filter(M, criterion = 1e-4):
         M[..., 2, 0] - M[..., 2, 1] + 1j * (M[..., 3, 0] - M[..., 3, 1]),
         M[..., 0, 2] - M[..., 1, 2] - 1j * (M[..., 0, 3] - M[..., 1, 3]),
         M[..., 0, 0] + M[..., 1, 1] - M[..., 0, 1] - M[..., 1, 0]
-    ], dim=-1).reshape(*M.shape[:-2], 4, 4)
+    ], dim=-1).reshape(*shape, 4, 4)
 
     # Eigen decomposition
     #D, P = torch.linalg.eig(N)
@@ -84,7 +84,7 @@ def mm_filter(M, criterion = 1e-4):
         newN[..., 0,2], newN[..., 0,3], newN[..., 1,2], newN[..., 1,3],
         newN[..., 2,0], newN[..., 2,1], newN[..., 3,0], newN[..., 3,1],
         newN[..., 2,2], newN[..., 2,3], newN[..., 3,2], newN[..., 3,3],
-    ], dim=-1).reshape(h,w,4,4)
+    ], dim=-1).reshape(*shape, 4, 4)
     
     M_filtered = torch.matmul(torch.matmul(A, F), torch.inverse(A))
     M_filtered = M_filtered / M_filtered[..., 0, 0][..., None, None].real
@@ -92,7 +92,7 @@ def mm_filter(M, criterion = 1e-4):
         
     M[invalid_mask, ...] = M_filtered[invalid_mask, ...]
 
-    return M.reshape(h, w, 16) if chs == 16 else M, invalid_mask
+    return M.reshape(*shape, 16) if chs == 16 else M, invalid_mask
 
 def C1(M):
     return 4 * M[..., 0, 0]

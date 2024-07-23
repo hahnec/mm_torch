@@ -48,8 +48,8 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
         torch.Tensor: A batched 2D tensor of results with shape (B, H - patch_size + 1, W - patch_size + 1)
     """
     # Ensure the input tensor is batched 2D
-    if input_tensor.dim() != 3:
-        raise ValueError("Input tensor must be batched 2D")
+    shape = input_tensor.shape
+    if len(shape) != 3: input_tensor = input_tensor.view(-1, *shape[-2:])
 
     # Unfold the input tensor to create patches
     unfolded = input_tensor.unfold(1, patch_size, step_size).unfold(2, patch_size, step_size)
@@ -70,6 +70,8 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     pad_half = (patch_size-1) // 2
     pad_odd = (patch_size-1) % 2
     result = torch.nn.functional.pad(result, [pad_half, pad_half+pad_odd, pad_half, pad_half+pad_odd], mode='replicate')
+
+    if len(shape) != 3: result = result.view(*shape)
     
     return result
 

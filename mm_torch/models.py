@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from mm.functions.mm import batched_mm
+from mm.functions.mm import compute_mm
 from mm.functions.mm_filter import EIG, PSD, SC
 from mm.functions.lu_chipman import batched_lc
 from mm.functions.polarimetry import batched_polarimetry
@@ -9,7 +9,7 @@ from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
-    def __init__(self, feature_keys=[], mask_fun=EIG, patch_size=4, perc=1, bA=None, bW=None, *args, **kwargs):
+    def __init__(self, feature_keys=[], mask_fun=EIG, patch_size=4, perc=1, bA=None, bW=None, wnum=None, *args, **kwargs):
         super(MuellerMatrixModel, self).__init__(*args, **kwargs)
 
         self.feature_keys = feature_keys
@@ -17,6 +17,7 @@ class MuellerMatrixModel(nn.Module):
         self.perc = perc
         self.bA = bA
         self.bW = bW
+        self.wnum = wnum
         self.feature_chs = [('intensity', 16), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1)]
         self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys])
         self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
@@ -24,24 +25,26 @@ class MuellerMatrixModel(nn.Module):
 
     def forward(self, x):
         bc, fc, hc, wc = x.shape
-        x, bA, bW = (x[:, :16], x[:, 16:32], x[:, 32:48]) if fc == 48 else (x[..., :16], self.bA, self.bW)
+        x = x.view(bc, self.wnum, 48, hc, wc).permute(0,1,3,4,2) if self.wnum > 1 else x.view(bc, 48, hc, wc).permute(0,2,3,1) # pack mueller matrix to last dimension
+        x, bA, bW = (x[..., :16], self.bA, self.bW) if fc == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
+        m = compute_mm(bA, bW, x, norm=True)
         y = torch.zeros((bc, 0, hc, wc), dtype=x.dtype, device=x.device)
-        m = batched_mm(bA, bW, x, norm=True)
         if 'intensity' in self.feature_keys:
             y = torch.cat((y, x), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std')):
-            v = self.mask_fun(m.permute(0, 2, 3, 1).reshape(m.shape[0], m.shape[2], m.shape[3], 4, 4)).unsqueeze(1)
-            l = batched_lc(m, mask=v.squeeze(1))
+            v = self.mask_fun(m)
+            v = v if self.wnum > 1 else v.unsqueeze(1)
+            l = batched_lc(m, mask=v)
             p = batched_polarimetry(l)
             if any(key in self.feature_keys for key in ('azimuth', 'std')):
-                feat_azi = p[:, 7]
+                feat_azi = p[:, 7] if self.wnum > 1 else p[:, 7][:, None]
                 if 'azimuth' in self.feature_keys:
-                    y = torch.cat([y, feat_azi[:, None]], dim=1)
+                    y = torch.cat([y, feat_azi], dim=1)
                 if 'std' in self.feature_keys:
                     feat_std = batched_rolling_window_metric(feat_azi, patch_size=self.patch_size, perc=self.perc, function=self.rolling_fun)
-                    y = torch.cat((y, feat_std[:, None]), dim=1)
+                    y = torch.cat((y, feat_std), dim=1)
             y = torch.cat([y, v], dim=1)
 
         return y

@@ -13,7 +13,7 @@ def mm_solver(A, W, I):
 def compute_mm(A, W, I, transpose=True, norm=True):
 
     # HxWx16 to HxWx4x4 matrix reshaping
-    shape = (*A.shape[:2], 4, 4)
+    shape = (*A.shape[:-1], 4, 4)
     A, W, I = [el.reshape(shape) for el in [A, W, I]]
 
     if transpose: A, W, I = [el.transpose(-2, -1) for el in [A, W, I]]
@@ -27,17 +27,15 @@ def compute_mm(A, W, I, transpose=True, norm=True):
     if norm: M = M / M[..., 0, 0][..., None, None]
 
     # flattening from HxWx4x4 to HxWx16 
-    return M.reshape(*shape[:2], -1)
+    return M.reshape(*shape[:-2], 16)
 
 def batched_mm(A, W, I, transpose=True, norm=True):
 
     shape = I.shape
     if shape[1] == 16: A, W, I = A.permute(0, 2, 3, 1), W.permute(0, 2, 3, 1), I.permute(0, 2, 3, 1)
-    res = compute_mm(A.flatten(1, 2), W.flatten(1, 2), I.flatten(1, 2), transpose, norm)
-    res = res.view(shape[0], *shape[2:], shape[1]) if shape[1] == 16 else res.view(*shape)
-    if shape[1] == 16: res = res.permute(0, 3, 1, 2)
+    mm = compute_mm(A, W, I, transpose, norm).view(*shape)
 
-    return res
+    return mm
 
 
 if __name__ == '__main__':
