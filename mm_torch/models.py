@@ -34,7 +34,7 @@ class MuellerMatrixModel(nn.Module):
         # compute polarimetry feature maps
         y = torch.zeros((b, 0, h, w), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
-            y = torch.cat((y, x.moveaxis(-1, 1).flatten(1, 2) if self.wnum > 1 else x.moveaxis(-1, 1)), dim=1)
+            y = torch.cat((y, x.moveaxis(-1, 1).flatten(1, 2)), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std')):
@@ -81,9 +81,9 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
 
         # weight layers
         self.i_layers, self.o_layers = [], []
-        if self.kernel_size > 0:
-            p = self.kernel_size // 2
-            for i in range(self.levels):
+        p = self.kernel_size // 2
+        for i in range(self.levels):
+            if self.kernel_size > 0:
                 i_conv = nn.Conv2d(kernel_size=self.kernel_size, stride=1, padding=p, in_channels=self.ichs, out_channels=self.ichs)
                 o_conv = nn.Conv2d(kernel_size=self.kernel_size, stride=1, padding=p, in_channels=self.ochs, out_channels=self.ochs)
                 if self.act_fun: i_conv, o_conv = self.act_fun(i_conv), self.act_fun(o_conv)
@@ -95,9 +95,15 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
                 else:
                     nn.init.xavier_uniform_(self.i_layers[i].weight)
                     nn.init.xavier_uniform_(self.o_layers[i].weight)
-            # use module list to enable device transfer
-            self.i_layers = nn.ModuleList(self.i_layers)
-            self.o_layers = nn.ModuleList(self.o_layers)
+            else:
+                # initialize empty layer functions to make model jit scriptable
+                self.i_layers.append(Identity())
+                self.o_layers.append(Identity())
+
+        # use module list to enable device transfer
+        self.i_layers = nn.ModuleList(self.i_layers)
+        self.o_layers = nn.ModuleList(self.o_layers)
+
 
     def pad(self, m, h, w):
 
@@ -109,12 +115,16 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         b, _, h, w = x.shape
         y = torch.zeros((b, 0, h, w), device=x.device, dtype=x.dtype)
         for i in range(self.levels):
-            if self.kernel_size > 0: x = self.i_layers[i](x)
+            x = self.i_layers[i](x)
             m = super().forward(x)
             m = self.upsampler(m) if i > 0 else m
             m = self.pad(m, h, w)
-            if self.kernel_size > 0: m = self.o_layers[i](m)
+            m = self.o_layers[i](m)
             y = torch.cat([y, m], dim=1)
             x = self.downsampler(x) if i < self.levels-1 else x
 
         return y
+
+class Identity(nn.Module): 
+    def forward(self, x): return x
+    
