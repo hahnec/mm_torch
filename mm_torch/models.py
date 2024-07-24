@@ -9,7 +9,7 @@ from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
-    def __init__(self, feature_keys=[], mask_fun=PSD, patch_size=4, perc=1, bA=None, bW=None, wnum=None, *args, **kwargs):
+    def __init__(self, feature_keys=[], mask_fun=PSD, patch_size=4, perc=1, wnum=1, in_channels=None, bA=None, bW=None, *args, **kwargs):
         super(MuellerMatrixModel, self).__init__(*args, **kwargs)
 
         self.feature_keys = feature_keys
@@ -18,8 +18,9 @@ class MuellerMatrixModel(nn.Module):
         self.bA = bA
         self.bW = bW
         self.wnum = wnum
-        self.feature_chs = [('intensity', 16), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1)]
+        self.feature_chs = [('intensity', 16), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1), ('mask', 1)]
         self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys]) * wnum
+        self.ichs = 48 * wnum if in_channels is None else in_channels
         self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
         self.mask_fun = mask_fun
 
@@ -37,18 +38,19 @@ class MuellerMatrixModel(nn.Module):
             y = torch.cat((y, x.moveaxis(-1, 1).flatten(1, 2)), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
-        if any(key in self.feature_keys for key in ('azimuth', 'std')):
+        if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
             v = self.mask_fun(m)
             l = batched_lc(m, mask=v)
             p = batched_polarimetry(l)
-            if any(key in self.feature_keys for key in ('azimuth', 'std')):
+            if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
                 feat_azi = p[:, 7]
                 if 'azimuth' in self.feature_keys:
                     y = torch.cat([y, feat_azi], dim=1)
                 if 'std' in self.feature_keys:
                     feat_std = batched_rolling_window_metric(feat_azi, patch_size=self.patch_size, perc=self.perc, function=self.rolling_fun)
                     y = torch.cat((y, feat_std), dim=1)
-            y = torch.cat([y, v], dim=1)
+            if 'mask' in self.feature_keys:
+                y = torch.cat([y, v], dim=1)
 
         return y
 
@@ -62,7 +64,6 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         self.mode = kwargs.pop('mode', 'bilinear')
         self.kernel_size = kwargs.pop('kernel_size', 0)
         self.activation = kwargs.pop('activation', None)
-        self.ichs = kwargs.pop('in_channels', 48)
         super().__init__(*args, **kwargs)
         self.ochs *= self.levels
 
@@ -73,7 +74,8 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         if self.method == 'pooling':
             self.downsampler = nn.MaxPool2d(2, stride=None, padding=0, dilation=1)
         elif self.method == 'averaging':
-            self.downsampler = nn.AvgPool2d(2, stride=None, padding=0, dilation=1)
+            self.ds = nn.AvgPool2d(2, stride=None, padding=0)
+            self.downsampler = lambda x: self.ds(x) * 4
         self.upsampler = nn.Upsample(scale_factor=2, mode=self.mode, align_corners=True)
         self.act_fun = None
         if self.activation:
@@ -85,13 +87,13 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         for i in range(self.levels):
             if self.kernel_size > 0:
                 i_conv = nn.Conv2d(kernel_size=self.kernel_size, stride=1, padding=p, in_channels=self.ichs, out_channels=self.ichs)
-                o_conv = nn.Conv2d(kernel_size=self.kernel_size, stride=1, padding=p, in_channels=self.ochs, out_channels=self.ochs)
-                if self.act_fun: i_conv, o_conv = self.act_fun(i_conv), self.act_fun(o_conv)
+                o_conv = nn.Conv2d(kernel_size=self.kernel_size, stride=1, padding=p, in_channels=self.ochs//self.levels, out_channels=self.ochs//self.levels)
+                if self.act_fun: i_conv, o_conv = nn.Sequential(i_conv, self.act_fun), nn.Sequential(o_conv, self.act_fun)
                 self.i_layers.append(i_conv)
                 self.o_layers.append(o_conv)
                 if self.activation:
-                    nn.init.kaiming_normal_(self.i_layers[i].weight, mode='fan_in', nonlinearity='relu')
-                    nn.init.kaiming_normal_(self.i_layers[i].weight, mode='fan_in', nonlinearity='relu')
+                    nn.init.kaiming_normal_(self.i_layers[i][0].weight, mode='fan_in', nonlinearity='relu')
+                    nn.init.kaiming_normal_(self.i_layers[i][0].weight, mode='fan_in', nonlinearity='relu')
                 else:
                     nn.init.xavier_uniform_(self.i_layers[i].weight)
                     nn.init.xavier_uniform_(self.o_layers[i].weight)
