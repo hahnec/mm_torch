@@ -3,14 +3,14 @@ import torch.nn as nn
 
 from mm.functions.mm import compute_mm
 from mm.functions.mm_filter import EIG, PSD, SC
-from mm.functions.lu_chipman import batched_lc
+from mm.functions.lu_chipman import lu_chipman, batched_lc
 from mm.functions.polarimetry import batched_polarimetry
 from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
-    def __init__(self, feature_keys=[], mask_fun=PSD, patch_size=4, perc=1, wnum=1, in_channels=None, bA=None, bW=None, *args, **kwargs):
-        super(MuellerMatrixModel, self).__init__(*args, **kwargs)
+    def __init__(self, feature_keys=[], mask_fun=EIG, patch_size=4, perc=1, wnum=1, in_channels=None, bA=None, bW=None, *args, **kwargs):
+        super(MuellerMatrixModel, self).__init__()
 
         self.feature_keys = feature_keys
         self.patch_size = patch_size
@@ -18,7 +18,7 @@ class MuellerMatrixModel(nn.Module):
         self.bA = bA
         self.bW = bW
         self.wnum = wnum
-        self.feature_chs = [('intensity', 16), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1), ('mask', 1)]
+        self.feature_chs = [('intensity', 0), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1), ('mask', 1)]
         self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys]) * wnum
         self.ichs = 48 * wnum if in_channels is None else in_channels
         self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
@@ -35,12 +35,12 @@ class MuellerMatrixModel(nn.Module):
         # compute polarimetry feature maps
         y = torch.zeros((b, 0, h, w), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
-            y = torch.cat((y, x.moveaxis(-1, 1).flatten(1, 2)), dim=1)
+            y = torch.cat((y, x.mean(-1)), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
             v = self.mask_fun(m)
-            l = batched_lc(m, mask=v)
+            l = lu_chipman(m, mask=v)
             p = batched_polarimetry(l)
             if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
                 feat_azi = p[:, 7]
@@ -73,6 +73,9 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         # spatial scalers
         if self.method == 'pooling':
             self.downsampler = nn.MaxPool2d(2, stride=None, padding=0, dilation=1)
+        elif self.method == 'averaging':
+            self.ds = nn.AvgPool2d(2, stride=None, padding=0)
+            self.downsampler = lambda x: self.ds(x) * 4
         elif self.method == 'averaging':
             self.ds = nn.AvgPool2d(2, stride=None, padding=0)
             self.downsampler = lambda x: self.ds(x) * 4
@@ -127,6 +130,25 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
 
         return y
 
+
 class Identity(nn.Module): 
     def forward(self, x): return x
-    
+
+
+def init_mm_model(cfg, train_opt=True):
+
+    MMM = MuellerMatrixPyramid if cfg.levels > 1 or cfg.kernel_size > 0 else MuellerMatrixModel
+        
+    mm_model = MMM(
+        feature_keys=cfg.feature_keys, 
+        method=cfg.method,
+        levels=cfg.levels, 
+        kernel_size=cfg.kernel_size,
+        perc=.95,
+        activation=cfg.activation,
+        wnum=len(cfg.wlens),
+        )
+    mm_model.to(device=cfg.device)
+    mm_model.train() if train_opt and cfg.kernel_size > 0 else mm_model.eval()
+
+    return mm_model
