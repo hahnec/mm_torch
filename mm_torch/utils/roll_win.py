@@ -47,7 +47,7 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     Returns:
         torch.Tensor: A batched 2D tensor of results with shape (B, H - patch_size + 1, W - patch_size + 1)
     """
-    # Ensure the input tensor is batched 2D
+
     shape = input_tensor.shape
     if len(shape) != 3: input_tensor = input_tensor.reshape(-1, *shape[-2:])
 
@@ -61,7 +61,7 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     result = function(unfolded)
     
     # Reshape the result back to batched 2D
-    output_shape = input_tensor.shape[0], input_tensor.shape[1] - patch_size + 1, input_tensor.shape[2] - patch_size + 1
+    output_shape = *shape[:-2], (input_tensor.shape[1]-patch_size)//step_size + 1, (input_tensor.shape[2]-patch_size)//step_size + 1
     result = result.view(output_shape)
 
     if 0 < perc < 1: result = percentile_clip(result, perc)
@@ -71,7 +71,7 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     pad_odd = (patch_size-1) % 2
     result = torch.nn.functional.pad(result, [pad_half, pad_half+pad_odd, pad_half, pad_half+pad_odd], mode='replicate')
 
-    if len(shape) != 3: result = result.view(*shape)
+    if len(shape) != 3: result = result.view(*shape[:-2], *result.shape[-2:])
     
     return result
 
