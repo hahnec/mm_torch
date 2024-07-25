@@ -76,9 +76,6 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         elif self.method == 'averaging':
             self.ds = nn.AvgPool2d(2, stride=None, padding=0)
             self.downsampler = lambda x: self.ds(x) * 4
-        elif self.method == 'averaging':
-            self.ds = nn.AvgPool2d(2, stride=None, padding=0)
-            self.downsampler = lambda x: self.ds(x) * 4
         self.upsampler = nn.Upsample(scale_factor=2, mode=self.mode, align_corners=True)
         self.act_fun = None
         if self.activation:
