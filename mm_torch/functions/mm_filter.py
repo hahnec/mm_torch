@@ -171,6 +171,5 @@ def charpoly(M):
 if __name__ == '__main__':
 
     M = torch.rand(10, 4, 4) * -1
-    result = PSD(M)
-    result = SC(M)
+    result = charpoly(M)
     print(result)
