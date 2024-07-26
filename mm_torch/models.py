@@ -2,14 +2,14 @@ import torch
 import torch.nn as nn
 
 from mm.functions.mm import compute_mm
-from mm.functions.mm_filter import EIG, PSD, SC
+from mm.functions.mm_filter import EIG, charpoly
 from mm.functions.lu_chipman import lu_chipman, batched_lc
 from mm.functions.polarimetry import batched_polarimetry
 from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
-    def __init__(self, feature_keys=[], mask_fun=EIG, patch_size=4, perc=1, wnum=1, in_channels=None, bA=None, bW=None, *args, **kwargs):
+    def __init__(self, feature_keys=[], mask_fun=charpoly, patch_size=4, perc=1, wnum=1, in_channels=None, bA=None, bW=None, *args, **kwargs):
         super(MuellerMatrixModel, self).__init__()
 
         self.feature_keys = feature_keys
