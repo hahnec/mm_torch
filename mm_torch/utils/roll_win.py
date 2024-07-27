@@ -64,7 +64,7 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     output_shape = *shape[:-2], (input_tensor.shape[1]-patch_size)//step_size + 1, (input_tensor.shape[2]-patch_size)//step_size + 1
     result = result.view(output_shape)
 
-    if 0 < perc < 1: result = percentile_clip(result, perc)
+    if 0 < perc < 1: result = percentile_clip(result, perc, mode='peaks')
 
     # padding
     pad_half = (patch_size-1) // 2
@@ -76,14 +76,17 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     return result
 
 
-def percentile_clip(img, perc=0.95):
+def percentile_clip(img, perc=0.95, mode=None):
 
-    pvals_max = torch.quantile(img.flatten(-2, -1), perc, dim=-1)
-    pvals_max_expanded = pvals_max[..., None, None].expand_as(img)
-    img = torch.minimum(img, pvals_max_expanded)
-    #pvals_min = torch.quantile(img.flatten(-2, -1), 1-perc, dim=-1)
-    #pvals_min_expanded = pvals_min[..., None, None].expand_as(img)
-    #img = torch.maximum(img, pvals_min_expanded)
+    mode = 'both' if mode == None else mode
+    if mode in ('peaks', 'both'):
+        pvals_max = torch.quantile(img.flatten(-2, -1), perc, dim=-1)
+        pvals_max_expanded = pvals_max[..., None, None].expand_as(img)
+        img = torch.minimum(img, pvals_max_expanded)
+    if mode in ('lows', 'both'):
+        pvals_min = torch.quantile(img.flatten(-2, -1), 1-perc, dim=-1)
+        pvals_min_expanded = pvals_min[..., None, None].expand_as(img)
+        img = torch.maximum(img, pvals_min_expanded)
 
     return img
 
