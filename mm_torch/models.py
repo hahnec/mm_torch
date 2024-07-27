@@ -79,7 +79,6 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         elif self.method == 'window':
             fun = lambda x: torch.std(x, dim=-1)
             self.downsampler = lambda x: batched_rolling_window_metric(x, patch_size=2, perc=1, function=fun, step_size=2)
-        self.upsampler = nn.Upsample(scale_factor=2, mode=self.mode, align_corners=True)
         self.act_fun = None
         if self.activation:
             self.act_fun = nn.LeakyReLU(inplace=True) if self.activation.lower().__contains__('leaky') else nn.ReLU(inplace=True)
@@ -109,24 +108,16 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         self.i_layers = nn.ModuleList(self.i_layers)
         self.o_layers = nn.ModuleList(self.o_layers)
 
-
-    def pad(self, m, h, w):
-
-        dh = h - m.size()[-2]
-        dw = w - m.size()[-1]
-        return nn.functional.pad(m, [dw//2, dw-dw//2, dh//2, dh-dh//2])
-
     def forward(self, x):
         b, _, h, w = x.shape
         y = torch.zeros((b, 0, h, w), device=x.device, dtype=x.dtype)
         for i in range(self.levels):
             x = self.i_layers[i](x)
             m = super().forward(x)
-            m = self.upsampler(m) if i > 0 else m
-            m = self.pad(m, h, w)
+            m = nn.functional.interpolate(m, size=(h, w), mode=self.mode, align_corners=True)
             m = self.o_layers[i](m)
             y = torch.cat([y, m], dim=1)
-            x = self.downsampler(x) if i < self.levels-1 else x
+            x = self.downsampler(x)
 
         return y
 
