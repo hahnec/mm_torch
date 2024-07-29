@@ -63,7 +63,7 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         self.method = kwargs.pop('method', 'pooling')
         self.mode = kwargs.pop('mode', 'bicubic')
         self.kernel_size = kwargs.pop('kernel_size', 0)
-        self.activation = kwargs.pop('activation', None)
+        self.activation = kwargs.pop('activation', 'leaky')
         self.downsample_factor = kwargs.pop('downsample_factor', 4)
         super().__init__(*args, **kwargs)
         self.ochs *= self.levels
