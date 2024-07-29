@@ -61,9 +61,10 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
         self.levels = kwargs.pop('levels', 2)
         assert self.levels > 0 and isinstance(self.levels, int), 'Levels must be a greater integer than zero.'
         self.method = kwargs.pop('method', 'pooling')
-        self.mode = kwargs.pop('mode', 'bilinear')
+        self.mode = kwargs.pop('mode', 'bicubic')
         self.kernel_size = kwargs.pop('kernel_size', 0)
         self.activation = kwargs.pop('activation', None)
+        self.downsample_factor = kwargs.pop('downsample_factor', 4)
         super().__init__(*args, **kwargs)
         self.ochs *= self.levels
 
@@ -72,13 +73,13 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
 
         # spatial scalers
         if self.method == 'pooling':
-            self.downsampler = nn.MaxPool2d(2, stride=None, padding=0, dilation=1)
+            self.downsampler = nn.MaxPool2d(self.downsample_factor, stride=None, padding=0, dilation=1)
         elif self.method == 'averaging':
-            self.ds = nn.AvgPool2d(2, stride=None, padding=0)
-            self.downsampler = lambda x: self.ds(x) * 4
+            self.ds = nn.AvgPool2d(self.downsample_factor, stride=None, padding=0)
+            self.downsampler = lambda x: self.ds(x) * self.downsample_factor**2
         elif self.method == 'window':
             fun = lambda x: torch.std(x, dim=-1)
-            self.downsampler = lambda x: batched_rolling_window_metric(x, patch_size=2, perc=1, function=fun, step_size=2)
+            self.downsampler = lambda x: batched_rolling_window_metric(x, patch_size=self.downsample_factor, perc=1, function=fun, step_size=self.downsample_factor)
         self.act_fun = None
         if self.activation:
             self.act_fun = nn.LeakyReLU(inplace=True) if self.activation.lower().__contains__('leaky') else nn.ReLU(inplace=True)
