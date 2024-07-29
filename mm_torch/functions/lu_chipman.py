@@ -19,6 +19,7 @@ def lu_chipman(
     M_0, MD = diattenuation_matrix(M)
 
     # retardance
+    mask = mask & ~torch.isnan(M_0[..., 1:4, 1:4].sum(-1).sum(-1))
     U_R = torch.zeros_like(M_0[..., 1:4, 1:4])
     V_R = torch.zeros_like(M_0[..., 1:4, 1:4])
     U_R[mask], _, V_R[mask] = svd_fun(M_0[..., 1:4, 1:4][mask])
