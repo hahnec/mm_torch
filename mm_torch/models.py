@@ -18,7 +18,7 @@ class MuellerMatrixModel(nn.Module):
         self.bA = bA
         self.bW = bW
         self.wnum = wnum
-        self.feature_chs = [('intensity', 1), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1), ('mask', 1)]
+        self.feature_chs = [('intensity', 1), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1), ('linr', 1), ('totp', 1), ('mask', 0)]
         self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys]) * wnum
         self.ichs = 48 * wnum if in_channels is None else in_channels
         self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
