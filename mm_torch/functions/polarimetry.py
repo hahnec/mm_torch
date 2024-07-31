@@ -14,8 +14,12 @@ def extract_depolarization(Mdelta):
 
     if Mdelta.shape[-1] == 16: Mdelta = Mdelta.view(*Mdelta.shape[:-1], 4, 4)
     values = torch.stack([Mdelta[..., 1, 1], Mdelta[..., 2, 2], Mdelta[..., 3, 3]], dim=-1)
+    values = values.abs().nanmean(-1)
 
-    return 1 - values.abs().mean(-1) 
+    # treat outliers as zeros (after subtracting) for numerical consistency
+    values[torch.isnan(values) | (values <= 0)] = 0
+
+    return 1 - values
 
 
 def extract_diattenuation(MD, transpose=True):
