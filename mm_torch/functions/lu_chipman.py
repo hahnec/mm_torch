@@ -1,11 +1,12 @@
 import torch
-from .mm_filter import EIG as mm_filter
+from .mm_filter import mm_filter, charpoly
 
 
 def lu_chipman(
         M, 
         mask=None, 
         transpose=True, 
+        filter_opt=False, 
         svd_fun=lambda x: torch.linalg.svd(x, full_matrices=False),
         ):
 
@@ -13,7 +14,8 @@ def lu_chipman(
     chs = M.shape[-1]
     if chs == 16: M = M.view(*M.shape[:-1], 4, 4)
     if transpose: M = M.transpose(-2, -1)
-    if mask is None: mask = mm_filter(M)
+    if filter_opt: M, _ = mm_filter(M)
+    if mask is None: mask = charpoly(M)
     shape = M.shape[:-2]
 
     M_0, MD = diattenuation_matrix(M)

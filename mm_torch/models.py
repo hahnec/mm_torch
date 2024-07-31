@@ -2,14 +2,14 @@ import torch
 import torch.nn as nn
 
 from mm.functions.mm import compute_mm
-from mm.functions.mm_filter import EIG, charpoly
+from mm.functions.mm_filter import charpoly
 from mm.functions.lu_chipman import lu_chipman, batched_lc
 from mm.functions.polarimetry import batched_polarimetry
 from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
-    def __init__(self, feature_keys=[], mask_fun=charpoly, patch_size=4, perc=1, wnum=1, in_channels=None, bA=None, bW=None, *args, **kwargs):
+    def __init__(self, feature_keys=[], mask_fun=charpoly, patch_size=4, perc=1, wnum=1, filter_opt=False, in_channels=None, bA=None, bW=None, *args, **kwargs):
         super(MuellerMatrixModel, self).__init__()
 
         self.feature_keys = feature_keys
@@ -18,6 +18,7 @@ class MuellerMatrixModel(nn.Module):
         self.bA = bA
         self.bW = bW
         self.wnum = wnum
+        self.filter_opt = filter_opt
         self.feature_chs = [('intensity', 1), ('mueller', 16), ('decompose', 14), ('azimuth', 1), ('std', 1), ('linr', 1), ('totp', 1), ('mask', 0)]
         self.ochs = sum([el[-1] for el in self.feature_chs if el[0] in self.feature_keys]) * wnum
         self.ichs = 48 * wnum if in_channels is None else in_channels
@@ -39,13 +40,13 @@ class MuellerMatrixModel(nn.Module):
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std', 'totp', 'linr', 'mask')):
-            v = self.mask_fun(m)
-            l = lu_chipman(m, mask=v)
+            v = self.mask_fun(m) if self.mask_fun is not None else torch.ones_like(m[..., 0], dtype=bool)
+            l = lu_chipman(m, mask=v, filter_opt=self.filter_opt)
             p = batched_polarimetry(l)
-            if 'linr' in self.feature_keys:
-                y = torch.cat([y, p[:, 6]], dim=1)
             if 'totp' in self.feature_keys:
                 y = torch.cat([y, p[:, -1]], dim=1)
+            if 'linr' in self.feature_keys:
+                y = torch.cat([y, p[:, 6]], dim=1)
             if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
                 feat_azi = p[:, 7]
                 if 'azimuth' in self.feature_keys:
