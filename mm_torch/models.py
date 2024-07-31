@@ -38,10 +38,14 @@ class MuellerMatrixModel(nn.Module):
             y = torch.cat((y, x.mean(-1)), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
-        if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
+        if any(key in self.feature_keys for key in ('azimuth', 'std', 'totp', 'linr', 'mask')):
             v = self.mask_fun(m)
             l = lu_chipman(m, mask=v)
             p = batched_polarimetry(l)
+            if 'linr' in self.feature_keys:
+                y = torch.cat([y, p[:, 6]], dim=1)
+            if 'totp' in self.feature_keys:
+                y = torch.cat([y, p[:, -1]], dim=1)
             if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
                 feat_azi = p[:, 7]
                 if 'azimuth' in self.feature_keys:
