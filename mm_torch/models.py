@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from mm.functions.mm import compute_mm
 from mm.functions.mm_filter import charpoly
-from mm.functions.lu_chipman import lu_chipman, batched_lc
+from mm.functions.lu_chipman import lu_chipman
 from mm.functions.polarimetry import batched_polarimetry
 from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
@@ -43,10 +43,10 @@ class MuellerMatrixModel(nn.Module):
             v = self.mask_fun(m) if self.mask_fun is not None else torch.ones_like(m[..., 0], dtype=bool)
             l = lu_chipman(m, mask=v, filter_opt=self.filter_opt)
             p = batched_polarimetry(l)
-            if 'totp' in self.feature_keys:
-                y = torch.cat([y, p[:, -1]], dim=1)
             if 'linr' in self.feature_keys:
                 y = torch.cat([y, p[:, 6]], dim=1)
+            if 'totp' in self.feature_keys:
+                y = torch.cat([y, p[:, -1]], dim=1)
             if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
                 feat_azi = p[:, 7]
                 if 'azimuth' in self.feature_keys:
@@ -132,7 +132,7 @@ class Identity(nn.Module):
     def forward(self, x): return x
 
 
-def init_mm_model(cfg, train_opt=True):
+def init_mm_model(cfg, train_opt=True, filter_opt=False):
 
     MMM = MuellerMatrixPyramid if cfg.levels > 1 or cfg.kernel_size > 0 else MuellerMatrixModel
         
@@ -144,6 +144,7 @@ def init_mm_model(cfg, train_opt=True):
         perc=.95,
         activation=cfg.activation,
         wnum=len(cfg.wlens),
+        filter_opt=filter_opt,
         )
     mm_model.to(device=cfg.device)
     mm_model.train() if train_opt and cfg.kernel_size > 0 else mm_model.eval()
