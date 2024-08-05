@@ -31,8 +31,7 @@ def lu_chipman(
     S_R[..., -1, -1][torch.sign(torch.det(M)) < 0] = -1 # modification of MR when the determinant of M is negative
 
     # Construct MR
-    MR = torch.eye(4, dtype=M.dtype, device=M.device)[None,]*len(shape)
-    MR = MR.repeat(*shape, 1, 1)
+    MR = torch.eye(4, dtype=M.dtype, device=M.device)[None,].repeat(*shape, 1, 1)
     MR[..., 1:4, 1:4] = U_R @ S_R @ V_R
 
     # depolarization
