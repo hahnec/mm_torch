@@ -96,7 +96,7 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
     retardance_vector = torch.stack([torch.ones_like(a1), a1, a2, a3], dim=-1)
 
     # Extraction of linear and circular phase retardance
-    linear_retardance = torch.acos(MR[..., 3, 3].real) / torch.pi * 180
+    linear_retardance = torch.acos(torch.clip(MR[..., 3, 3].real, -1., 1.)) / torch.pi * 180
     circular_retardance = torch.atan2((MR[..., 2, 1] - MR[..., 1, 2]).real, (MR[..., 2, 2] + MR[..., 1, 1]).real) / torch.pi * 180
 
     # Decomposition of the retardance matrix into a linear-circular product
