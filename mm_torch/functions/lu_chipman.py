@@ -27,8 +27,7 @@ def lu_chipman(
     U_R[mask], _, V_R[mask] = svd_fun(M_0[..., 1:4, 1:4][mask])
 
     # unit vector to replace rectangular diagonal matrix (capital sigma)
-    S_R = torch.eye(3, dtype=M.dtype, device=M.device)[None,]*len(shape)
-    S_R = S_R.repeat(*shape, 1, 1)
+    S_R = torch.eye(3, dtype=M.dtype, device=M.device)[None,].repeat(*shape, 1, 1)
     S_R[..., -1, -1][torch.sign(torch.det(M)) < 0] = -1 # modification of MR when the determinant of M is negative
 
     # Construct MR
