@@ -131,11 +131,35 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
 class Identity(nn.Module): 
     def forward(self, x): return x
 
+class MuellerMatrixSelector(nn.Module):
+    def __init__(self, wnum=1, bA=None, bW=None, *args, **kwargs):
+        super(MuellerMatrixSelector, self).__init__()
+        self.bA = bA
+        self.bW = bW
+        self.wnum = wnum
+        self.ochs = 10
+    def forward(self, x):
+        b, f, h, w = x.shape
+        # unravel wavelength dimension and pack Mueller features to last dimension
+        x = x.view(b, self.wnum, 48, h, w).moveaxis(2, -1)
+        # split calibration data
+        x, bA, bW = (x[..., :16], self.bA, self.bW) if f == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
+        # compute Mueller matrix
+        m = compute_mm(bA, bW, x, norm=True)
+        # select relevant entries (skip first row and first column except for 1,1)
+        s = torch.cat((m[..., 0][..., None], m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)), dim=-1)
+
+        return s.squeeze(1).moveaxis(-1, 1)
 
 def init_mm_model(cfg, train_opt=True, filter_opt=False):
 
-    MMM = MuellerMatrixPyramid if cfg.levels > 1 or cfg.kernel_size > 0 else MuellerMatrixModel
-        
+    if cfg.levels > 1 or cfg.kernel_size > 0:
+        MMM = MuellerMatrixPyramid
+    elif cfg.levels == 0:
+        MMM = MuellerMatrixSelector
+    else:
+        MMM = MuellerMatrixModel
+    
     mm_model = MMM(
         feature_keys=cfg.feature_keys, 
         method=cfg.method,
@@ -146,6 +170,7 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False):
         wnum=len(cfg.wlens),
         filter_opt=filter_opt,
         )
+
     mm_model.to(device=cfg.device)
     mm_model.train() if train_opt and cfg.kernel_size > 0 else mm_model.eval()
 
