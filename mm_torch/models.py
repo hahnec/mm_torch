@@ -150,7 +150,7 @@ class Identity(nn.Module):
     def forward(self, x): return x
 
 class MuellerMatrixSelector(nn.Module):
-    def __init__(self, ochs=16, norm_opt=1, wnum=1, bA=None, bW=None, *args, **kwargs):
+    def __init__(self, ochs=10, norm_opt=1, wnum=1, bA=None, bW=None, *args, **kwargs):
         super(MuellerMatrixSelector, self).__init__()
         self.bA = bA
         self.bW = bW
