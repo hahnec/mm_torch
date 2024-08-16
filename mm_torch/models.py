@@ -13,7 +13,7 @@ class MuellerMatrixModel(nn.Module):
             self, 
             feature_keys=[], 
             mask_fun=charpoly, 
-            norm_opt=1, 
+            norm_opt=0, 
             patch_size=4, 
             perc=1, 
             wnum=1, 
