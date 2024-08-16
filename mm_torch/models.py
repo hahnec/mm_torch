@@ -150,13 +150,14 @@ class Identity(nn.Module):
     def forward(self, x): return x
 
 class MuellerMatrixSelector(nn.Module):
-    def __init__(self, norm_opt=1, wnum=1, bA=None, bW=None, *args, **kwargs):
+    def __init__(self, ochs=16, norm_opt=1, wnum=1, bA=None, bW=None, *args, **kwargs):
         super(MuellerMatrixSelector, self).__init__()
         self.bA = bA
         self.bW = bW
         self.norm_opt = norm_opt
         self.wnum = wnum
-        self.ochs = 10
+        self.ochs = ochs
+
     def forward(self, x):
         b, f, h, w = x.shape
         # unravel wavelength dimension and pack Mueller features to last dimension
@@ -165,10 +166,12 @@ class MuellerMatrixSelector(nn.Module):
         x, bA, bW = (x[..., :16], self.bA, self.bW) if f == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
         # compute Mueller matrix
         m = compute_mm(bA, bW, x, norm=self.norm_opt)
-        # select relevant entries (skip first row and first column except for 1,1)
-        s = torch.cat((m[..., 0][..., None], m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)), dim=-1)
 
-        return s.squeeze(1).moveaxis(-1, 1)
+        if self.ochs == 10:
+            # select relevant entries (skip first row and first column except for 1,1)
+            m = torch.cat((m[..., 0][..., None], m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)), dim=-1)
+
+        return m.squeeze(1).moveaxis(-1, 1)
 
 
 def init_mm_model(cfg, train_opt=True, filter_opt=False):
