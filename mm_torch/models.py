@@ -9,7 +9,21 @@ from mm.utils.roll_win import batched_rolling_window_metric, circstd
 
 
 class MuellerMatrixModel(nn.Module):
-    def __init__(self, feature_keys=[], mask_fun=charpoly, patch_size=4, perc=1, wnum=1, filter_opt=False, in_channels=None, bA=None, bW=None, *args, **kwargs):
+    def __init__(
+            self, 
+            feature_keys=[], 
+            mask_fun=charpoly, 
+            norm_opt=1, 
+            patch_size=4, 
+            perc=1, 
+            wnum=1, 
+            filter_opt=False, 
+            in_channels=None, 
+            bA=None, 
+            bW=None, 
+            *args, 
+            **kwargs,
+            ):
         super(MuellerMatrixModel, self).__init__()
 
         self.feature_keys = feature_keys
@@ -24,6 +38,7 @@ class MuellerMatrixModel(nn.Module):
         self.ichs = 48 * wnum if in_channels is None else in_channels
         self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
         self.mask_fun = mask_fun
+        self.norm_opt = norm_opt
 
     def forward(self, x):
         b, f, h, w = x.shape
@@ -44,15 +59,18 @@ class MuellerMatrixModel(nn.Module):
             l = lu_chipman(m, mask=v, filter_opt=self.filter_opt)
             p = batched_polarimetry(l)
             if 'linr' in self.feature_keys:
-                y = torch.cat([y, p[:, 6]], dim=1)
+                linr = p[:, 6] / p[:, 6].max() if self.norm_opt else p[:, 6]
+                y = torch.cat([y, linr], dim=1)
             if 'totp' in self.feature_keys:
-                y = torch.cat([y, p[:, -1]], dim=1)
+                totp = p[:, -1] / p[:, -1].max() if self.norm_opt else p[:, -1]
+                y = torch.cat([y, totp], dim=1)
             if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
-                feat_azi = p[:, 7]
+                feat_azi = p[:, 7] / 180 if self.norm_opt else p[:, 7]
                 if 'azimuth' in self.feature_keys:
                     y = torch.cat([y, feat_azi], dim=1)
                 if 'std' in self.feature_keys:
                     feat_std = batched_rolling_window_metric(feat_azi, patch_size=self.patch_size, perc=self.perc, function=self.rolling_fun)
+                    if self.norm_opt: feat_std = feat_std/feat_std.max()
                     y = torch.cat((y, feat_std), dim=1)
             if 'mask' in self.feature_keys:
                 y = torch.cat([y, v], dim=1)
@@ -132,10 +150,11 @@ class Identity(nn.Module):
     def forward(self, x): return x
 
 class MuellerMatrixSelector(nn.Module):
-    def __init__(self, wnum=1, bA=None, bW=None, *args, **kwargs):
+    def __init__(self, norm_opt=1, wnum=1, bA=None, bW=None, *args, **kwargs):
         super(MuellerMatrixSelector, self).__init__()
         self.bA = bA
         self.bW = bW
+        self.norm_opt = norm_opt
         self.wnum = wnum
         self.ochs = 10
     def forward(self, x):
@@ -145,11 +164,12 @@ class MuellerMatrixSelector(nn.Module):
         # split calibration data
         x, bA, bW = (x[..., :16], self.bA, self.bW) if f == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
         # compute Mueller matrix
-        m = compute_mm(bA, bW, x, norm=True)
+        m = compute_mm(bA, bW, x, norm=self.norm_opt)
         # select relevant entries (skip first row and first column except for 1,1)
         s = torch.cat((m[..., 0][..., None], m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)), dim=-1)
 
         return s.squeeze(1).moveaxis(-1, 1)
+
 
 def init_mm_model(cfg, train_opt=True, filter_opt=False):
 
