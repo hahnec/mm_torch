@@ -43,7 +43,7 @@ class MuellerMatrixModel(nn.Module):
     def forward(self, x):
         b, f, h, w = x.shape
         # unravel wavelength dimension and pack Mueller features to last dimension
-        x = x.view(b, self.wnum, 48, h, w).moveaxis(2, -1)
+        x = x.view(b, self.wnum, f//self.wnum, h, w).moveaxis(2, -1)
         # split calibration data
         x, bA, bW = (x[..., :16], self.bA, self.bW) if f == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
         # compute Mueller matrix
