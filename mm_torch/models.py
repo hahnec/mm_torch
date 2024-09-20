@@ -167,7 +167,7 @@ class MuellerMatrixSelector(nn.Module):
         # compute Mueller matrix
         m = compute_mm(bA, bW, x, norm=self.norm_opt)
 
-        # extract first column and first row (3x3 matrix)
+        # extract matrix skipping first column and first row (3x3 matrix)
         r = m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)
         if self.ochs == 10:
             # merge 1,1 entry with 3x3 matrix
