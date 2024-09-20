@@ -150,7 +150,7 @@ class Identity(nn.Module):
     def forward(self, x): return x
 
 class MuellerMatrixSelector(nn.Module):
-    def __init__(self, ochs=10, norm_opt=1, wnum=1, bA=None, bW=None, *args, **kwargs):
+    def __init__(self, ochs=9, norm_opt=1, wnum=1, bA=None, bW=None, *args, **kwargs):
         super(MuellerMatrixSelector, self).__init__()
         self.bA = bA
         self.bW = bW
@@ -167,9 +167,10 @@ class MuellerMatrixSelector(nn.Module):
         # compute Mueller matrix
         m = compute_mm(bA, bW, x, norm=self.norm_opt)
 
+        r = m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)
         if self.ochs == 10:
             # select relevant entries (skip first row and first column except for 1,1)
-            m = torch.cat((m[..., 0][..., None], m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)), dim=-1)
+            r = torch.cat((m[..., 0][..., None], r), dim=-1)
 
         return m.squeeze(1).moveaxis(-1, 1)
 
