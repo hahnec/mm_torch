@@ -167,9 +167,10 @@ class MuellerMatrixSelector(nn.Module):
         # compute Mueller matrix
         m = compute_mm(bA, bW, x, norm=self.norm_opt)
 
+        # extract first column and first row (3x3 matrix)
         r = m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)
         if self.ochs == 10:
-            # select relevant entries (skip first row and first column except for 1,1)
+            # merge 1,1 entry with 3x3 matrix
             r = torch.cat((m[..., 0][..., None], r), dim=-1)
 
         return m.squeeze(1).moveaxis(-1, 1)
