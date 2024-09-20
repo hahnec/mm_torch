@@ -173,7 +173,7 @@ class MuellerMatrixSelector(nn.Module):
             # merge 1,1 entry with 3x3 matrix
             r = torch.cat((m[..., 0][..., None], r), dim=-1)
 
-        return m.squeeze(1).moveaxis(-1, 1)
+        return r.squeeze(1).moveaxis(-1, 1)
 
 
 def init_mm_model(cfg, train_opt=True, filter_opt=False):
