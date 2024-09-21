@@ -101,7 +101,7 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
     #circular_retardance = torch.atan2((MR[..., 2, 1] - MR[..., 1, 2]).real, (MR[..., 2, 2] + MR[..., 1, 1]).real) / torch.pi * 180
 
     # rectification?
-    circular_retardance = torch.acos(torch.clip(MR[..., 3, 3].real, -1., 1.)) / torch.pi * 180
+    circular_retardance = acos_nansafe(MR[..., 3, 3].real) / torch.pi * 180
     
     # Decomposition of the retardance matrix into a linear-circular product
     MRC = rota(circular_retardance / 2)
