@@ -1,5 +1,6 @@
 import torch
 
+acos_nansafe = lambda x: torch.acos(torch.clip(x, -1., 1.))
 
 def extract_depolarization(Mdelta):
     """
@@ -121,8 +122,9 @@ def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=T
     MRL[tot_MR<tol] = MR[tot_MR<tol]
 
     # linear retardance according to HORAO papers
-    linear_retardance = torch.acos(((MRL[..., 1, 1] + MRL[..., 2, 2])**2 + (MRL[..., 2, 1] - MRL[..., 1, 2])**2)**.5 - 1) / torch.pi * 180
-    circular_retardance = torch.acos(torch.clip(MRL[..., 3, 3].real, -1., 1.)) / torch.pi * 180
+    M_n = (MRL[..., 1, 1] + MRL[..., 2, 2])**2 + (MRL[..., 2, 1] - MRL[..., 1, 2])**2
+    linear_retardance = acos_nansafe(M_n**.5 - 1) / torch.pi * 180
+    circular_retardance = acos_nansafe(MRL[..., 3, 3].real) / torch.pi * 180
 
     orientation_linear_retardance = torch.atan2(MRL[..., 1, 3], MRL[..., 3, 2]) / torch.pi * 180
     #orientation_linear_retardance[tot_MR<0] = tol
