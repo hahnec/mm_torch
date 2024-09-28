@@ -176,7 +176,7 @@ class MuellerMatrixSelector(nn.Module):
         return r.squeeze(1).moveaxis(-1, 1)
 
 
-def init_mm_model(cfg, train_opt=True, filter_opt=False):
+def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
 
     if cfg.levels > 1 or cfg.kernel_size > 0:
         MMM = MuellerMatrixPyramid
@@ -194,6 +194,8 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False):
         activation=cfg.activation,
         wnum=len(cfg.wlens),
         filter_opt=filter_opt,
+        *args, 
+        **kwargs,
         )
 
     mm_model.to(device=cfg.device)
