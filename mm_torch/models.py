@@ -47,7 +47,7 @@ class MuellerMatrixModel(nn.Module):
         # split calibration data
         x, bA, bW = (x[..., :16], self.bA, self.bW) if f == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
         # compute Mueller matrix
-        m = compute_mm(bA, bW, x, norm=True)
+        m = compute_mm(bA, bW, x, norm=self.norm_opt)
         # compute polarimetry feature maps
         y = torch.zeros((b, 0, h, w), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
@@ -186,6 +186,8 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
         MMM = MuellerMatrixSelector
     else:
         MMM = MuellerMatrixModel
+
+    norm_opt = cfg.norm_opt if hasattr(cfg, 'norm_opt') else False 
     
     mm_model = MMM(
         feature_keys=cfg.feature_keys, 
@@ -196,6 +198,7 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
         activation=cfg.activation,
         wnum=len(cfg.wlens),
         filter_opt=filter_opt,
+        norm_opt=norm_opt,
         *args, 
         **kwargs,
         )
