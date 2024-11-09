@@ -167,13 +167,17 @@ class MuellerMatrixSelector(nn.Module):
         # compute Mueller matrix
         m = compute_mm(bA, bW, x, norm=self.norm_opt)
 
-        r = m
         if self.ochs in (9, 10):
             # extract matrix skipping first column and first row (3x3 matrix)
             r = m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)
             if self.ochs == 10:
-                # merge 1,1 entry with 3x3 matrix
-                r = torch.cat((m[..., 0][..., None], r), dim=-1)
+                if self.norm_opt:
+                    # concatenate normalized image
+                    norm_img = x.sum(-1, keepdim=True)/x.flatten(1,-1).max()
+                    r = torch.cat([r, norm_img], dim=-1) if self.norm_opt else m
+                else:
+                    # merge 1,1 entry with 3x3 matrix
+                    r = torch.cat((m[..., 0][..., None], r), dim=-1)
 
         return r.squeeze(1).moveaxis(-1, 1)
 
