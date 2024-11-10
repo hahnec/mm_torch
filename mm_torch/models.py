@@ -174,7 +174,7 @@ class MuellerMatrixSelector(nn.Module):
                 if self.norm_opt:
                     # concatenate normalized images
                     norm_img = x.sum(-1, keepdim=True) / x.flatten(1, -1).max()
-                    r = torch.cat([norm_img, r], dim=-1)
+                    r = torch.cat((norm_img, r), dim=-1)
                 else:
                     # merge 1,1 entry with 3x3 matrix
                     r = torch.cat((m[..., 0][..., None], r), dim=-1)
