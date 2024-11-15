@@ -167,6 +167,7 @@ class MuellerMatrixSelector(nn.Module):
         # compute Mueller matrix
         m = compute_mm(bA, bW, x, norm=self.norm_opt)
 
+        r = m
         if self.ochs in (9, 10):
             # extract matrix skipping first column and first row (3x3 matrix)
             r = m.view(*m.shape[:-1], 4, 4)[..., 1:, 1:].flatten(-2, -1)
@@ -191,7 +192,8 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
     else:
         MMM = MuellerMatrixModel
 
-    norm_opt = cfg.norm_opt if hasattr(cfg, 'norm_opt') else False 
+    ochs = cfg.ochs if hasattr(cfg, 'ochs') else 10
+    norm_opt = cfg.norm_opt if hasattr(cfg, 'norm_opt') else False
     
     mm_model = MMM(
         feature_keys=cfg.feature_keys, 
@@ -203,6 +205,7 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
         wnum=len(cfg.wlens),
         filter_opt=filter_opt,
         norm_opt=norm_opt,
+        ochs=ochs,
         *args, 
         **kwargs,
         )
