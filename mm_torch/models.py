@@ -182,7 +182,7 @@ class MuellerMatrixSelector(nn.Module):
                     intensity_min = intensity.amin(dim=(1, 2, 3), keepdim=True)
                     intensity_max = intensity.amax(dim=(1, 2, 3), keepdim=True)
                     intensity_norm = (intensity - intensity_min) / (intensity_max - intensity_min)
-                    r = torch.cat((intensity_norm, r), dim=-1)
+                    r = torch.cat((intensity_norm[..., None], r), dim=-1)
                 else:
                     # merge 1,1 entry with 3x3 matrix
                     r = torch.cat((m[..., 0][..., None], r), dim=-1)
