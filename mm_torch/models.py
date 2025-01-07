@@ -51,7 +51,11 @@ class MuellerMatrixModel(nn.Module):
         # compute polarimetry feature maps
         y = torch.zeros((b, 0, h, w), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
-            y = torch.cat((y, x.mean(-1)), dim=1)
+            intensity = x.sum(-1)
+            intensity_min = intensity.amin(dim=(1, 2, 3), keepdim=True)
+            intensity_max = intensity.amax(dim=(1, 2, 3), keepdim=True)
+            intensity_norm = (intensity - intensity_min) / (intensity_max - intensity_min)
+            y = torch.cat((y, intensity_norm), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
         if any(key in self.feature_keys for key in ('azimuth', 'std', 'totp', 'linr', 'mask')):
@@ -174,8 +178,11 @@ class MuellerMatrixSelector(nn.Module):
             if self.ochs == 10:
                 if self.norm_opt:
                     # concatenate normalized images
-                    norm_img = x.sum(-1, keepdim=True) / x.flatten(1, -1).max()
-                    r = torch.cat((norm_img, r), dim=-1)
+                    intensity = x.sum(-1)
+                    intensity_min = intensity.amin(dim=(1, 2, 3), keepdim=True)
+                    intensity_max = intensity.amax(dim=(1, 2, 3), keepdim=True)
+                    intensity_norm = (intensity - intensity_min) / (intensity_max - intensity_min)
+                    r = torch.cat((intensity_norm, r), dim=-1)
                 else:
                     # merge 1,1 entry with 3x3 matrix
                     r = torch.cat((m[..., 0][..., None], r), dim=-1)
