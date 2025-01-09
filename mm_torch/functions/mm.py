@@ -54,6 +54,6 @@ if __name__ == '__main__':
     W = W.unsqueeze(0).repeat(8, 1, 1, 1)
     I = I.unsqueeze(0).repeat(8, 1, 1, 1)
 
-    batched_M_torch = batched_mm(A, W, I, filter=True)
+    batched_M_torch = batched_mm(A, W, I)
 
     assert batched_M_torch.shape == (8, 128, 128, 16), 'dimensions mismatch'
