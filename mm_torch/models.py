@@ -58,7 +58,7 @@ class MuellerMatrixModel(nn.Module):
             y = torch.cat((y, intensity_norm), dim=1)
         if 'mueller' in self.feature_keys:
             y = torch.cat((y, m), dim=1)
-        if any(key in self.feature_keys for key in ('azimuth', 'std', 'totp', 'linr', 'mask')):
+        if any(key in self.feature_keys for key in ('azimuth', 'std', 'totp', 'linr', 'datt', 'mask')):
             v = self.mask_fun(m) if self.mask_fun is not None else torch.ones_like(m[..., 0], dtype=bool)
             l = lu_chipman(m, mask=v, filter_opt=self.filter_opt)
             p = batched_polarimetry(l)
@@ -68,6 +68,9 @@ class MuellerMatrixModel(nn.Module):
             if 'totp' in self.feature_keys:
                 totp = p[:, -1] / p[:, -1].max() if self.norm_opt else p[:, -1]
                 y = torch.cat([y, totp], dim=1)
+            if 'datt' in self.feature_keys:
+                diatt = p[:, 0] / p[:, 0].max() if self.norm_opt else p[:, 0]
+                y = torch.cat([y, diatt], dim=1)
             if any(key in self.feature_keys for key in ('azimuth', 'std', 'mask')):
                 feat_azi = p[:, 7] / 180 if self.norm_opt else p[:, 7]
                 if 'azimuth' in self.feature_keys:
