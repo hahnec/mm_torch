@@ -51,7 +51,7 @@ class MuellerMatrixModel(nn.Module):
         # compute polarimetry feature maps
         y = torch.zeros((b, 0, h, w), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
-            intensity = x.sum(-1)
+            intensity = x[..., 0] #x.sum(-1)
             intensity_min = intensity.amin(dim=(1, 2, 3), keepdim=True)
             intensity_max = intensity.amax(dim=(1, 2, 3), keepdim=True)
             intensity_norm = (intensity - intensity_min) / (intensity_max - intensity_min)
@@ -181,7 +181,7 @@ class MuellerMatrixSelector(nn.Module):
             if self.ochs == 10:
                 if self.norm_opt:
                     # concatenate normalized images
-                    intensity = x.sum(-1)
+                    intensity = x[..., 0] #x.sum(-1)
                     intensity_min = intensity.amin(dim=(1, 2, 3), keepdim=True)
                     intensity_max = intensity.amax(dim=(1, 2, 3), keepdim=True)
                     intensity_norm = (intensity - intensity_min) / (intensity_max - intensity_min)
