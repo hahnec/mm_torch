@@ -70,7 +70,7 @@ def diattenuation_matrix(M):
     eye = eye.repeat(*shape, 1, 1)
     MD[..., 1:, 1:] = D1 * eye + (1 - D1) * outer_product / D**2
     M_0 = M @ torch.linalg.inv(MD)
-    MD[D.squeeze(-1).squeeze(-1)==0] = torch.eye(4, dtype=M.dtype, device=M.device)
+    MD[D.squeeze(-1).squeeze(-1)==0] = torch.eye(4, dtype=M.dtype, device=M.device).repeat(torch.sum(D==0), 1, 1)
     M_0[D.squeeze(-1).squeeze(-1)==0] = M[D.squeeze(-1).squeeze(-1)==0]
 
     return M_0, MD
