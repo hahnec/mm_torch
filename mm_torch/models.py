@@ -2,6 +2,8 @@ from mm.model_luchipman import LuChipmanModel
 from mm.model_pyramid import LuChipmanPyramid
 from mm.model_mueller import MuellerMatrixSelector
 
+from mm.functions.mm_filter import charpoly
+
 
 def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
 
@@ -18,6 +20,7 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
     
     mm_model = MuellerMatrixModel(
         feature_keys=cfg.feature_keys, 
+        mask_fun=charpoly if 'mask' in cfg.feature_keys else None,
         method=cfg.method,
         levels=cfg.levels, 
         kernel_size=cfg.kernel_size,

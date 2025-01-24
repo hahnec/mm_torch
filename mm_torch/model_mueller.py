@@ -13,6 +13,7 @@ class MuellerMatrixSelector(nn.Module):
             wnum=1,
             bA=None, 
             bW=None, 
+            mask_fun=charpoly,
             *args, 
             **kwargs
         ):
@@ -22,6 +23,7 @@ class MuellerMatrixSelector(nn.Module):
         self.norm_opt = norm_opt    # normalization option
         self.wnum = wnum            # wavelength number
         self.ochs = ochs            # output channel number
+        self.mask_fun = mask_fun    # realizability
 
     def forward(self, x):
         b, f, h, w = x.shape
@@ -47,5 +49,8 @@ class MuellerMatrixSelector(nn.Module):
                 else:
                     # merge 1,1 entry with 3x3 matrix
                     r = torch.cat((m[..., 0][..., None], r), dim=-1)
+
+        # append realizability mask
+        if self.mask_fun is not None: r = torch.cat((self.mask_fun(m)[..., None], r), dim=-1)
 
         return r.squeeze(1).moveaxis(-1, 1)
