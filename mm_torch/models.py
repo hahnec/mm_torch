@@ -51,7 +51,7 @@ class MuellerMatrixModel(nn.Module):
         # compute polarimetry feature maps
         y = torch.zeros((b, 0, h, w), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
-            intensity = x[..., 0] #x.sum(-1)
+            intensity = x[..., 0]
             intensity_min = intensity.amin(dim=(1, 2, 3), keepdim=True)
             intensity_max = intensity.amax(dim=(1, 2, 3), keepdim=True)
             intensity_norm = (intensity - intensity_min) / (intensity_max - intensity_min)
@@ -156,14 +156,24 @@ class MuellerMatrixPyramid(MuellerMatrixModel):
 class Identity(nn.Module): 
     def forward(self, x): return x
 
+
 class MuellerMatrixSelector(nn.Module):
-    def __init__(self, ochs=10, norm_opt=1, wnum=1, bA=None, bW=None, *args, **kwargs):
+    def __init__(
+            self, 
+            ochs=10, 
+            norm_opt=1, 
+            wnum=1,
+            bA=None, 
+            bW=None, 
+            *args, 
+            **kwargs
+        ):
         super(MuellerMatrixSelector, self).__init__()
-        self.bA = bA
-        self.bW = bW
-        self.norm_opt = norm_opt
-        self.wnum = wnum
-        self.ochs = ochs
+        self.bA = bA                # calibration matrix A
+        self.bW = bW                # calibration matrix W
+        self.norm_opt = norm_opt    # normalization option
+        self.wnum = wnum            # wavelength number
+        self.ochs = ochs            # output channel number
 
     def forward(self, x):
         b, f, h, w = x.shape
@@ -181,7 +191,7 @@ class MuellerMatrixSelector(nn.Module):
             if self.ochs == 10:
                 if self.norm_opt:
                     # concatenate normalized images
-                    intensity = x[..., 0] #x.sum(-1)
+                    intensity = x[..., 0]
                     intensity_min = intensity.amin(dim=(1, 2, 3), keepdim=True)
                     intensity_max = intensity.amax(dim=(1, 2, 3), keepdim=True)
                     intensity_norm = (intensity - intensity_min) / (intensity_max - intensity_min)
