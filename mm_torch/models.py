@@ -6,17 +6,17 @@ from mm.model_mueller import MuellerMatrixSelector
 def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
 
     if cfg.levels > 1 or cfg.kernel_size > 0:
-        MMM = LuChipmanPyramid
+        MuellerMatrixModel = LuChipmanPyramid
     elif cfg.levels == 0:
-        MMM = MuellerMatrixSelector
+        MuellerMatrixModel = MuellerMatrixSelector
     else:
-        MMM = LuChipmanModel
+        MuellerMatrixModel = LuChipmanModel
 
     # default values
     ochs = cfg.ochs if hasattr(cfg, 'ochs') else 10
     norm_opt = cfg.norm_opt if hasattr(cfg, 'norm_opt') else False
     
-    mm_model = MMM(
+    mm_model = MuellerMatrixModel(
         feature_keys=cfg.feature_keys, 
         method=cfg.method,
         levels=cfg.levels, 
