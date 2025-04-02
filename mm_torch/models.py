@@ -17,6 +17,7 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
     # default values
     ochs = cfg.ochs if hasattr(cfg, 'ochs') else 10
     norm_opt = cfg.norm_opt if hasattr(cfg, 'norm_opt') else False
+    norm_mueller = cfg.norm_mueller if hasattr(cfg, 'norm_mueller') else True
     
     mm_model = MuellerMatrixModel(
         feature_keys=cfg.feature_keys, 
@@ -29,6 +30,7 @@ def init_mm_model(cfg, train_opt=True, filter_opt=False, *args, **kwargs):
         wnum=len(cfg.wlens),
         filter_opt=filter_opt,
         norm_opt=norm_opt,
+        norm_mueller=norm_mueller,
         ochs=ochs,
         *args, 
         **kwargs,

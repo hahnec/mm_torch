@@ -10,6 +10,7 @@ class MuellerMatrixSelector(nn.Module):
             self, 
             ochs=10, 
             norm_opt=1, 
+            norm_mueller=1, 
             wnum=1,
             bA=None, 
             bW=None, 
@@ -18,12 +19,13 @@ class MuellerMatrixSelector(nn.Module):
             **kwargs
         ):
         super(MuellerMatrixSelector, self).__init__()
-        self.bA = bA                # calibration matrix A
-        self.bW = bW                # calibration matrix W
-        self.norm_opt = norm_opt    # normalization option
-        self.wnum = wnum            # wavelength number
-        self.ochs = ochs            # output channel number
-        self.mask_fun = mask_fun    # realizability
+        self.bA = bA                        # calibration matrix A
+        self.bW = bW                        # calibration matrix W
+        self.norm_opt = norm_opt            # normalization option
+        self.norm_mueller = norm_mueller    # normalization option
+        self.wnum = wnum                    # wavelength number
+        self.ochs = ochs                    # output channel number
+        self.mask_fun = mask_fun            # realizability
 
     def forward(self, x):
         b, f, h, w = x.shape
@@ -32,7 +34,7 @@ class MuellerMatrixSelector(nn.Module):
         # split calibration data
         x, bA, bW = (x[..., :16], self.bA, self.bW) if f == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
         # compute Mueller matrix
-        m = compute_mm(bA, bW, x, norm=self.norm_opt)
+        m = compute_mm(bA, bW, x, norm=self.norm_mueller)
 
         r = m
         if self.ochs in (9, 10):

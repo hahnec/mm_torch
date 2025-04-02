@@ -14,6 +14,7 @@ class LuChipmanModel(nn.Module):
             feature_keys=[], 
             mask_fun=charpoly, 
             norm_opt=0, 
+            norm_mueller=True, 
             wnum=1, 
             patch_size=8, 
             perc=1, 
@@ -39,6 +40,7 @@ class LuChipmanModel(nn.Module):
         self.rolling_fun = lambda x: circstd(x/180*torch.pi, high=torch.pi, low=0, dim=-1)/torch.pi*180
         self.mask_fun = mask_fun
         self.norm_opt = norm_opt
+        self.norm_mueller = norm_mueller
 
     def forward(self, x):
         b, f, h, w = x.shape
@@ -47,7 +49,7 @@ class LuChipmanModel(nn.Module):
         # split calibration data
         x, bA, bW = (x[..., :16], self.bA, self.bW) if f == 16 else (x[..., :16], x[..., 16:32], x[..., 32:48])
         # compute Mueller matrix
-        m = compute_mm(bA, bW, x, norm=self.norm_opt)
+        m = compute_mm(bA, bW, x, norm=self.norm_mueller)
         # compute polarimetry feature maps
         y = torch.zeros((b, 0, h, w), dtype=x.dtype, device=x.device)
         if 'intensity' in self.feature_keys:
