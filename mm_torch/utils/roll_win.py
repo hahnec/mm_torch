@@ -14,20 +14,21 @@ def rolling_window_metric(input_tensor, patch_size=4, function=torch.std, step_s
     Returns:
         torch.Tensor: A 2D tensor of results with shape (H - patch_size + 1, W - patch_size + 1)
     """
-    # Ensure the input tensor is 2D
+
+    # ensure the input tensor is 2D
     if input_tensor.dim() != 2:
         raise ValueError("Input tensor must be 2D")
     
-    # Unfold the input tensor to create patches
+    # unfold the input tensor to create patches
     unfolded = input_tensor.unfold(0, patch_size, step_size).unfold(1, patch_size, step_size)
     
     # unfolded shape is (H - patch_size + 1, W - patch_size + 1, patch_size, patch_size)
     unfolded = unfolded.contiguous().view(-1, patch_size * patch_size)
     
-    # Compute the metric along the last dimension
+    # compute the metric along the last dimension
     result = function(unfolded, dim=-1)
     
-    # Reshape the result back to 2D
+    # reshape the result back to 2D
     output_shape = input_tensor.shape[0] - patch_size + 1, input_tensor.shape[1] - patch_size + 1
     result = result.view(output_shape)
     
@@ -51,16 +52,16 @@ def batched_rolling_window_metric(input_tensor, patch_size=4, function=torch.std
     shape = input_tensor.shape
     if len(shape) != 3: input_tensor = input_tensor.reshape(-1, *shape[-2:])
 
-    # Unfold the input tensor to create patches
+    # unfold the input tensor to create patches
     unfolded = input_tensor.unfold(1, patch_size, step_size).unfold(2, patch_size, step_size)
     
     # unfolded shape is (B, H - patch_size + 1, W - patch_size + 1, patch_size, patch_size)
     unfolded = unfolded.contiguous().view(-1, patch_size * patch_size)
     
-    # Compute the metric
+    # compute the metric
     result = function(unfolded)
     
-    # Reshape the result back to batched 2D
+    # reshape the result back to batched 2D
     output_shape = *shape[:-2], (input_tensor.shape[1]-patch_size)//step_size + 1, (input_tensor.shape[2]-patch_size)//step_size + 1
     result = result.view(output_shape)
 
@@ -104,23 +105,29 @@ def circstd(samples, high=2*torch.pi, low=0, dim=-1):
     Returns:
     torch.Tensor: Circular standard deviation along the specified dimension.
     """
-    # Convert samples to radians
+
+    # convert samples to radians
     samples = (samples - low) * 2 * torch.pi / (high - low)
     
-    # Compute sum of sines and cosines along the specified dimension
+    # compute sum of sines and cosines along the specified dimension
     sin_sum = torch.sum(torch.sin(samples), dim=dim)
     cos_sum = torch.sum(torch.cos(samples), dim=dim)
     
-    # Compute mean angle along the specified dimension
-    #mean_angle = torch.atan2(sin_sum, cos_sum)
-
-    # Compute resultant vector length R
+    # compute resultant vector length R
     R = torch.sqrt(sin_sum**2 + cos_sum**2) / samples.size(dim)
 
-    # Compute circular variance
-    #circ_var = 1 - R
-
-    # Compute circular standard deviation
+    # compute circular standard deviation
     circ_std = torch.sqrt(-2 * torch.log(R))
 
     return circ_std * (high - low) / (2 * torch.pi)
+
+if __name__ == '__main__':
+
+    angles = torch.tensor([0, torch.pi/2, torch.pi, 3*torch.pi/2])  # 0, 90, 180, 270 degrees
+
+    # custom implementation
+    print(circstd(angles))
+
+    # reference implementation
+    from scipy.stats import circstd
+    print(circstd(angles))
