@@ -26,11 +26,11 @@ def lu_chipman(
     V_R = torch.zeros_like(M_0[..., 1:4, 1:4])
     U_R[mask], _, V_R[mask] = svd_fun(M_0[..., 1:4, 1:4][mask])
 
-    # unit vector to replace rectangular diagonal matrix (capital sigma)
+    # unit vector to replace diagonal matrix (capital sigma)
     S_R = torch.eye(3, dtype=M.dtype, device=M.device)[None,].repeat(*shape, 1, 1)
     S_R[..., -1, -1][torch.sign(torch.det(M)) < 0] = -1 # modification of MR when the determinant of M is negative
 
-    # Construct MR
+    # construct MR
     MR = torch.eye(4, dtype=M.dtype, device=M.device)[None,].repeat(*shape, 1, 1)
     MR[..., 1:4, 1:4] = U_R @ S_R @ V_R
 
