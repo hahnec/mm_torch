@@ -58,4 +58,6 @@ def plot_fiber(raw_azimuth, linr, intensity=None, mask=None, window=5, n=10, opt
 	w, h = fig.get_size_inches() * fig.get_dpi()
 	quiver_img = np.frombuffer(canvas.tostring_rgb(), dtype='uint8').reshape(int(h), int(w), 3)
 
+	plt.close(fig)
+
 	return quiver_img
