@@ -66,7 +66,7 @@ def EIG(M):
     shape = M.shape[:-1] if chs == 16 else M.shape[:-2]
     M = M.reshape(*shape, 4, 4) if chs == 16 else M
 
-    # Complex-valued covariance matrix
+    # complex-valued covariance matrix
     N = 0.25 * torch.stack([
         M[..., 0, 0] + M[..., 1, 1] + M[..., 0, 1] + M[..., 1, 0],
         M[..., 0, 2] + M[..., 1, 2] + 1j * (M[..., 0, 3] + M[..., 1, 3]),
@@ -86,13 +86,17 @@ def EIG(M):
         M[..., 0, 0] + M[..., 1, 1] - M[..., 0, 1] - M[..., 1, 0]
     ], dim=-1).reshape(*shape, 4, 4)
 
-    # Eigenvalue extraction
+    # detect and exclude NaNs
+    nans = N.isnan().flatten(-2, -1).any(-1)
+    N[nans] = torch.eye(4, dtype=N.dtype, device=N.device)
+
+    # eigenvalue extraction
     D = torch.linalg.eigvals(N)
 
     # all per-pixel eigenvalues have to be positive
     mask = torch.all(D.real > 0, dim=-1)
 
-    return mask
+    return mask & ~nans
 
 def charpoly(M):
 
