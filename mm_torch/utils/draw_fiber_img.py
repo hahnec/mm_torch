@@ -23,7 +23,9 @@ def plot_fiber(raw_azimuth, linr, intensity=None, mask=None, window=5, n=10, opt
 	v = magnitude*linr*orientation_sin
 
 	fig, ax = plt.subplots()
-	if intensity is not None: ax.imshow(intensity, cmap = 'gray')
+	if intensity is not None:
+		intensity = (intensity-intensity.min())/(intensity.max()-intensity.min())
+		ax.imshow(intensity, cmap = 'gray')
 
 	if option == 'quiver':
 		tracts = ax.quiver(
