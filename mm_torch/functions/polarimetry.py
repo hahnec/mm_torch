@@ -54,6 +54,21 @@ def extract_diattenuation(MD, transpose=True):
     return torch.stack([tot_d, lin_d, cir_d, ori_d], dim=1)
 
 
+def extract_azimuth(MR, transpose=True):
+
+    chs = MR.shape[-1]
+    if chs == 16: MR = MR.view(*MR.shape[:-1], 4, 4)
+
+    if transpose: MR = MR.transpose(-2, -1)
+
+    orientation_linear_retardance = torch.atan2(MR[..., 1, 3], MR[..., 3, 2]) / torch.pi * 180
+
+    # wrap around angles
+    mask = orientation_linear_retardance < 0
+    orientation_linear_retardance[mask] = 360 - abs(orientation_linear_retardance[mask])
+
+    return orientation_linear_retardance / 2
+
 def extract_retardance(MR, decomposition_choice='LIN-CIR', tol=1e-9, transpose=True):
     """
     Extraction of polarimetric retardance parameters from a retardance matrix MR.
