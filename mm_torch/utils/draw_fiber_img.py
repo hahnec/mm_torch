@@ -3,7 +3,7 @@ import numpy as np
 import scipy.ndimage as ndimage
 from skimage.restoration import unwrap_phase
 
-def plot_fiber(raw_azimuth, linr, intensity=None, mask=None, window=5, n=10, option='quiver'):
+def plot_fiber(raw_azimuth, linr=10, intensity=None, mask=None, window=5, n=10, option='quiver'):
 
 	azimuth = np.pi*raw_azimuth/180
 	X, Y = np.meshgrid(np.arange(azimuth.shape[1]), np.arange(azimuth.shape[0]))
@@ -19,8 +19,8 @@ def plot_fiber(raw_azimuth, linr, intensity=None, mask=None, window=5, n=10, opt
 	if mask is not None: raw_azimuth = np.ma.masked_where(mask, raw_azimuth)
 	if mask is not None: orientation_cos = np.ma.masked_where(mask, orientation_cos)
 	if mask is not None: orientation_sin = np.ma.masked_where(mask, orientation_sin)
-	u = magnitude*linr*orientation_cos
-	v = magnitude*linr*orientation_sin
+	u = magnitude * orientation_cos * linr
+	v = magnitude * orientation_sin * linr
 
 	fig, ax = plt.subplots()
 	if intensity is not None:
