@@ -37,11 +37,6 @@ def lu_chipman(
     # depolarization
     Mdelta = torch.matmul(M_0, MR.transpose(-2, -1))
 
-    # exclude imaginary parts
-    MD = MD.real
-    MR = MR.real
-    Mdelta = Mdelta.real
-
     if transpose:
         MD = MD.transpose(-2, -1)
         MR = MR.transpose(-2, -1)
@@ -58,20 +53,27 @@ def diattenuation_matrix(M):
 
     dvec = torch.stack([M[..., 0, 1], M[..., 0, 2], M[..., 0, 3]], dim=-1) / (M[..., 0, 0][..., None] +  1e-13)
     D = (M[..., 0, 1]**2 + M[..., 0, 2]**2 + M[..., 0, 3]**2)**.5
-    D1 = (1 - D**2)**.5
+    #D1 = (1 - D**2)**.5
+    D1 = (torch.clamp(1 - D**2, min=0))**.5
     D, D1 = D[..., None, None], D1[..., None, None]
     
-    MD = torch.eye(4, dtype=M.dtype, device=M.device)[None,]*len(shape)
-    MD = MD.repeat(*shape, 1, 1)
+    #MD = torch.eye(4, dtype=M.dtype, device=M.device)[None,]*len(shape)
+    #MD = MD.repeat(*shape, 1, 1)
+    MD = torch.eye(4, dtype=M.dtype, device=M.device).expand(*shape, 4, 4).clone()
     MD[..., 0, 1:] = dvec
     MD[..., 1:, 0] = dvec
     outer_product = dvec[..., None] * dvec[..., None, :] # torch.outer(dvec, dvec)
-    eye = torch.eye(3, device=M.device)[None,]*len(shape)
-    eye = eye.repeat(*shape, 1, 1)
-    MD[..., 1:, 1:] = D1 * eye + (1 - D1) * outer_product / D**2
+    #eye = torch.eye(3, device=M.device)[None,]*len(shape)
+    #eye = eye.repeat(*shape, 1, 1)
+    eye = torch.eye(3, device=M.device).expand(*shape, 3, 3)
+    MD[..., 1:, 1:] = D1 * eye + (1 - D1) * outer_product / (D**2 + 1e-13)
     M_0 = M @ torch.linalg.inv(MD)
-    MD[D.squeeze(-1).squeeze(-1)==0] = torch.eye(4, dtype=M.dtype, device=M.device).repeat(torch.sum(D==0), 1, 1)
-    M_0[D.squeeze(-1).squeeze(-1)==0] = M[D.squeeze(-1).squeeze(-1)==0]
+    
+    #MD[D.squeeze(-1).squeeze(-1)==0] = torch.eye(4, dtype=M.dtype, device=M.device).repeat(torch.sum(D==0), 1, 1)
+    #M_0[D.squeeze(-1).squeeze(-1)==0] = M[D.squeeze(-1).squeeze(-1)==0]
+    zero_mask = (D.squeeze(-1).squeeze(-1) == 0)
+    MD = torch.where(zero_mask[..., None, None], torch.eye(4, device=M.device), MD)
+    M_0 = torch.where(zero_mask[..., None, None], M, M_0)
 
     return M_0, MD
 
