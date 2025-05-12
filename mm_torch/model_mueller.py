@@ -55,4 +55,9 @@ class MuellerMatrixSelector(nn.Module):
         # append realizability mask
         if self.mask_fun is not None: r = torch.cat((r, self.mask_fun(m)[..., None]), dim=-1)
 
-        return r.squeeze(1).moveaxis(-1, 1)
+        if self.wnum > 1:
+            r = r.moveaxis(-1, 2)
+            r = r.reshape(r.shape[0], r.shape[1]*r.shape[2], r.shape[3], r.shape[4])
+            return r
+        else:
+            return r.squeeze(1).moveaxis(-1, 1)
