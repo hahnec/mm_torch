@@ -53,9 +53,8 @@ def plot_fiber(raw_azimuth, linr=10, intensity=None, mask=None, window=5, n=10, 
 	plt.close(fig)
 	# color bar figure
 	fig_cb, ax_cb = plt.subplots(figsize=(0.5, 4))  # Tall vertical colorbar
-	fig_cb.subplots_adjust(left=0.45, right=0.8, top=0.95, bottom=0.05)
+	fig_cb.subplots_adjust(left=0.6, right=0.4, top=0.95, bottom=0.05)
 	cbar = fig_cb.colorbar(tracts, cax=ax_cb)
-	ax_cb.tick_params(left=False, labelleft=False, right=False)
 	# render colorbar image
 	canvas_cb = FigureCanvas(fig_cb)
 	canvas_cb.draw()
