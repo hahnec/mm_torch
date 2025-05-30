@@ -52,8 +52,8 @@ def plot_fiber(raw_azimuth, linr=10, intensity=None, mask=None, window=5, n=10, 
 	quiver_img = np.frombuffer(canvas.tostring_rgb(), dtype='uint8').reshape(int(h), int(w), 3)
 	plt.close(fig)
 	# color bar figure
-	fig_cb, ax_cb = plt.subplots(figsize=(0.5, 4))  # Tall vertical colorbar
-	fig_cb.subplots_adjust(left=0.45, right=1.0, top=0.95, bottom=0.05)
+	fig_cb, ax_cb = plt.subplots(figsize=(1.0, 4))  # Tall vertical colorbar
+	fig_cb.subplots_adjust(left=0.45, right=0.55, top=0.95, bottom=0.05)
 	cbar = fig_cb.colorbar(tracts, cax=ax_cb)
 	# render colorbar image
 	canvas_cb = FigureCanvas(fig_cb)
