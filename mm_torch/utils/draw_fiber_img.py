@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import numpy as np
 import scipy.ndimage as ndimage
 from skimage.restoration import unwrap_phase
@@ -35,7 +36,6 @@ def plot_fiber(raw_azimuth, linr=10, intensity=None, mask=None, window=5, n=10, 
 			headwidth = 2, 
 			cmap = plt.cm.twilight_shifted,
 		)
-		fig.colorbar(tracts, orientation='vertical')
 
 	if option == 'streamplot':
 		u = +cos_mean_masked
@@ -50,9 +50,9 @@ def plot_fiber(raw_azimuth, linr=10, intensity=None, mask=None, window=5, n=10, 
 			maxlength = 20., 
 		)
 
+	ax.set_axis_off()
 	ax.axis('off')
 	plt.tight_layout()
-	from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 	canvas = FigureCanvas(fig)
 	canvas.draw()
 
@@ -62,4 +62,17 @@ def plot_fiber(raw_azimuth, linr=10, intensity=None, mask=None, window=5, n=10, 
 
 	plt.close(fig)
 
-	return quiver_img
+	# color bar figure
+	fig_cb, ax_cb = plt.subplots(figsize=(0.5, 4))  # Tall vertical colorbar
+	fig_cb.subplots_adjust(left=0.4, right=0.6, top=0.95, bottom=0.05)
+	cbar = fig_cb.colorbar(tracts, cax=ax_cb)
+	ax_cb.tick_params(left=False, labelleft=False, right=False)
+
+    # Render colorbar image
+	canvas_cb = FigureCanvas(fig_cb)
+	canvas_cb.draw()
+	w_cb, h_cb = fig_cb.get_size_inches() * fig_cb.get_dpi()
+	colorbar_img = np.frombuffer(canvas_cb.tostring_rgb(), dtype='uint8').reshape(int(h_cb), int(w_cb), 3)
+	plt.close(fig_cb)
+
+	return quiver_img, colorbar_img
