@@ -21,7 +21,7 @@ def lu_chipman(
     M_0, MD = diattenuation_matrix(M)
 
     # retardance
-    mask = mask & ~torch.isnan(M_0[..., 1:4, 1:4].sum(-1).sum(-1))
+    mask = mask & ~torch.isnan(M_0[..., 1:4, 1:4]).any(dim=(-2, -1))
     U_R = torch.zeros_like(M_0[..., 1:4, 1:4])
     V_R = torch.zeros_like(M_0[..., 1:4, 1:4])
     U_R[mask], _, V_R[mask] = svd_fun(M_0[..., 1:4, 1:4][mask])
@@ -31,7 +31,8 @@ def lu_chipman(
     S_R[..., -1, -1][torch.sign(torch.det(M)) < 0] = -1 # modification of MR when the determinant of M is negative
 
     # construct MR
-    MR = torch.eye(4, dtype=M.dtype, device=M.device)[None,].repeat(*shape, 1, 1)
+    MR = torch.zeros_like(M)
+    MR[:, 0, 0] = 1
     MR[..., 1:4, 1:4] = U_R @ S_R @ V_R
 
     # depolarization
