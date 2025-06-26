@@ -8,7 +8,7 @@ from mm.functions.mm_filter import charpoly
 class MuellerMatrixSelector(nn.Module):
     def __init__(
             self, 
-            ochs=10, 
+            ochs=16, 
             norm_opt=1, 
             norm_mueller=1, 
             wnum=1,
