@@ -8,7 +8,7 @@ This repository provides Mueller Matrix computations for PyTorch featuring the L
 
 ## Example showing brain fiber tracts
 
-![Fiber tract plot](./docs/quiver_plot_mm_torch.png)
+![Fiber tract plot](./docs/quiver_plot_mm_torch_crop.png)
 
 <br>
 <p align="left" style="background-color: white;">
