@@ -11,7 +11,7 @@ This repository provides Mueller Matrix computations for PyTorch featuring the L
 ![Fiber tract plot](./docs/quiver_plot_mm_torch_crop.png)
 
 <br>
-<p align="left" style="background-color: white;">
+<p align="center" style="background-color: white;">
   <img src="docs/color_bar.svg" alt="Colorbar" width="33%" />
 </p>
 
